@@ -20,7 +20,7 @@ st.set_page_config(
 st.title("📊 FinAnalyzer Pro - Análisis Financiero Inteligente")
 
 # Clave de API de Gemini
-API_KEY = "AIzaSyCMqbyl7yrGtY-Os1BPgoOJpRnX49E_Wv0"
+API_KEY = "AIzaSyCMqbyl7yrGtY-Os1BPgoOJpRgnX49E_Wv0"
 
 # Estilos CSS mejorados
 st.markdown("""
@@ -163,11 +163,16 @@ st.markdown("""
 
 # Configuración de Gemini 
 try:
-    client = genai.Client(api_key=API_KEY)  
+    # Configurar la API key primero
+    genai.configure(api_key=API_KEY)
+    
+    # Inicializar el modelo (sintaxis actual)
+    model = genai.GenerativeModel('gemini-pro')
     gemini_configured = True
+    
 except Exception as e:
     st.sidebar.warning(f"⚠️ Error configurando Gemini: {e}")
-    client = None
+    model = None
     gemini_configured = False
 
 # HEADER PRINCIPAL MEJORADO
@@ -347,10 +352,7 @@ def obtener_analisis_ia(tickers, info_tickers, datos_tickers):
         """
         
         with st.spinner('🤖 Gemini está realizando análisis...'):
-            response = client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=prompt
-            )
+            response = model.generate_content(prompt)
         
         return response.text
         
