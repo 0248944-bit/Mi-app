@@ -166,14 +166,9 @@ try:
     client = genai.Client(api_key=API_KEY)  
     gemini_configured = True
 except Exception as e:
-    try:
-        from google import genai
-        client = genai.Client(api_key=API_KEY)
-        gemini_configured = True
-    except Exception as e2:
-        st.sidebar.warning(f"⚠️ Error configurando Gemini: {e2}")
-        client = None
-        gemini_configured = False
+    st.sidebar.warning(f"⚠️ Error configurando Gemini: {e}")
+    client = None
+    gemini_configured = False
 
 # HEADER PRINCIPAL MEJORADO
 col1, col2, col3 = st.columns([1, 2, 1])
