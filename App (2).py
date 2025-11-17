@@ -16,13 +16,13 @@ except Exception:
 
 # Configuración de la página (debe ser lo primero)
 st.set_page_config(
-    page_title="FinAnalyzer Pro - Análisis Financiero Inteligente",
+    page_title="FinAnalyzer - Análisis Financiero Inteligente",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-st.title("📊 FinAnalyzer Pro - Análisis Financiero Inteligente")
+st.title("📊 FinAnalyzer - Análisis Financiero Inteligente")
 
 # --- CSS (como en tu versión original) ---
 st.markdown("""
@@ -83,7 +83,7 @@ else:
 # HEADER
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
-    st.markdown('<div class="main-header">🚀 FinAnalyzer Pro</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header">🚀 FinAnalyzer </div>', unsafe_allow_html=True)
     st.markdown("<div style='text-align:center;color:#6c757d'>Plataforma de análisis financiero inteligente con IA integrada</div>", unsafe_allow_html=True)
 
 # SIDEBAR - Inputs mejorados
