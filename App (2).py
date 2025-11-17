@@ -165,7 +165,7 @@ st.markdown("""
 try:
     import google.generativeai as genai
     genai.configure(api_key=API_KEY)
-    model = genai.GenerativeModel('gemini-pro')
+    model = genai.GenerativeModel('gemini-1.5-flash')
     gemini_configured = True
     st.sidebar.success("✅ Gemini configurado correctamente")
 except Exception as e:
