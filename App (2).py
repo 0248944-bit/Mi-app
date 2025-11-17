@@ -261,33 +261,6 @@ periodo_map = {
 fecha_inicio = fecha_actual - periodo_map[periodo]
 
 # Función para calcular rendimientos porcentuales (CORREGIDA)
-def calcular_rendimientos(data):
-    """
-    Calcula los rendimientos porcentuales diarios y acumulados
-    """
-    data = data.copy()
-    
-    # Asegurarse de que Close es numérico
-    data['Close'] = pd.to_numeric(data['Close'], errors='coerce')
-    data = data.dropna(subset=['Close'])
-    
-    # Rendimiento diario porcentual
-    data['Rendimiento_Diario'] = data['Close'].pct_change() * 100
-    
-    # Rendimiento acumulado (desde el primer día del dataset)
-    if len(data) > 0:
-        precio_inicial = data['Close'].iloc[0]
-        data['Rendimiento_Acumulado'] = (data['Close'] / precio_inicial - 1) * 100
-    
-    # Rendimiento rolling (promedio móvil de 30 días)
-    data['Rendimiento_Rolling_30d'] = data['Rendimiento_Diario'].rolling(window=30).mean()
-    
-    # Volatilidad rolling (desviación estándar de 30 días)
-    data['Volatilidad_30d'] = data['Rendimiento_Diario'].rolling(window=30).std()
-    
-    return data
-
-# Función para obtener análisis comparativo de Gemini (ACTUALIZADA)
 def obtener_analisis_ia(tickers, info_tickers, datos_tickers):
     """
     Obtiene análisis comparativo de Gemini basado en la información fundamental
@@ -350,10 +323,7 @@ def obtener_analisis_ia(tickers, info_tickers, datos_tickers):
         """
         
         with st.spinner('🤖 Gemini está realizando análisis...'):
-            response = client.models.generate_content(
-                model="gemini-2.0-flash",  # MODELO ACTUALIZADO
-                contents=prompt
-            )
+            response = model.generate_content(prompt)  # ← USA 'model' NO 'client'
         
         return response.text
         
