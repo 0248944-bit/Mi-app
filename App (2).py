@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import google.generativeai as genai  # ← CORREGIDO: "genai" con N
 import matplotlib.dates as mdates
 import numpy as np
-
+import os
 # Configuración de la página (debe ser lo primero)
 st.set_page_config(
     page_title="FinAnalyzer Pro - Análisis Financiero Inteligente",
@@ -20,7 +20,7 @@ st.set_page_config(
 st.title("📊 FinAnalyzer Pro - Análisis Financiero Inteligente")
 
 # Clave de API de Gemini
-API_KEY = "AIzaSyCMqbyl7yrGtY-Os1BPgoOJpRgnX49E_Wv0"
+API_KEY = os.getenv('API_KEY', 'fallback_key_si_no_existe')
 
 # Estilos CSS mejorados
 st.markdown("""
