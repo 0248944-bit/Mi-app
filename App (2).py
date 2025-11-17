@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 import google.generativeai as genai
 import matplotlib.dates as mdates
 import numpy as np
-import io
 
 # Configuración de la página (debe ser lo primero)
 st.set_page_config(
@@ -19,6 +18,8 @@ st.set_page_config(
 
 # Título de la app
 st.title("📊 FinAnalyzer Pro - Análisis Financiero Inteligente")
+
+
 
 # Estilos CSS mejorados
 st.markdown("""
@@ -159,10 +160,10 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# CONFIGURACIÓN DE GEMINI (USANDO TU LÓGICA INICIAL - SIN CAMBIOS)
+# Configuración de Gemini 
 try:
     import google.generativeai as genai
-    # ✅ Obtener API key de secrets (misma lógica que tu código inicial)
+    # ✅ Obtener API key de secrets
     API_KEY = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=API_KEY)
     model = genai.GenerativeModel('gemini-1.5-flash')
@@ -290,7 +291,7 @@ def calcular_rendimientos(data):
     
     return data
 
-# Función para obtener análisis comparativo de Gemini (manteniendo tu lógica)
+# Función para obtener análisis comparativo de Gemini
 def obtener_analisis_ia(tickers, info_tickers, datos_tickers):
     """
     Obtiene análisis comparativo de Gemini basado en la información fundamental
@@ -353,7 +354,7 @@ def obtener_analisis_ia(tickers, info_tickers, datos_tickers):
         """
         
         with st.spinner('🤖 Gemini está realizando análisis...'):
-            # Usar model (misma lógica original)
+            # ✅ CORRECCIÓN: Usar model en lugar de client.models
             response = model.generate_content(prompt)
         
         return response.text
@@ -493,39 +494,6 @@ def mostrar_info_corporativa(ticker, info, es_principal=True):
     if not es_principal:
         st.markdown('</div>', unsafe_allow_html=True)
 
-# NUEVA: métricas de performance robustas (siempre devuelve claves)
-def compute_performance_metrics(df):
-    metrics = {
-        'CAGR': np.nan,
-        'Cumulative': np.nan,
-        'Annualized Volatility': np.nan,
-        'Sharpe': np.nan,
-        'Max Drawdown': np.nan
-    }
-    try:
-        if df is None or df.empty:
-            return metrics
-        # Asegurar que Date esté presente y ordenado
-        df = df.sort_values('Date')
-        rtn = df['Close'].pct_change().dropna()
-        if rtn.empty:
-            return metrics
-        total_days = (df['Date'].iloc[-1] - df['Date'].iloc[0]).days
-        years = total_days / 365.25 if total_days > 0 else 1/252
-        cumulative_return = (df['Close'].iloc[-1] / df['Close'].iloc[0]) - 1
-        metrics['CAGR'] = (1 + cumulative_return) ** (1 / years) - 1 if years > 0 else np.nan
-        metrics['Annualized Volatility'] = rtn.std() * np.sqrt(252)
-        metrics['Sharpe'] = (rtn.mean() / rtn.std()) * np.sqrt(252) if rtn.std() != 0 else np.nan
-        cum = (1 + rtn).cumprod()
-        peak = cum.cummax()
-        drawdown = (cum / peak) - 1
-        metrics['Max Drawdown'] = drawdown.min()
-        metrics['Cumulative'] = cumulative_return
-    except Exception:
-        # en caso de error devolvemos los np.nan ya presentes
-        pass
-    return metrics
-
 # CONTENIDO PRINCIPAL
 try:
     # Lista de todos los tickers a procesar
@@ -548,14 +516,13 @@ try:
                 info_tickers[ticker] = obtener_info_empresa(ticker)
                 st.success(f"✅ {ticker} - Datos descargados correctamente")
             else:
-                datos_tickers[ticker] = pd.DataFrame()
                 st.error(f"❌ {ticker} - Error en descarga")
             
             progress_bar.progress((i + 1) / len(todos_tickers))
         
         status.update(label="✅ ¡Todos los datos descargados!", state="complete", expanded=False)
     
-    if not any(not df.empty for df in datos_tickers.values()):
+    if not datos_tickers:
         st.error("❌ No se encontraron datos para ningún ticker ingresado")
         st.stop()
     
@@ -575,58 +542,49 @@ try:
                 st.session_state.analisis_ia = False
                 st.rerun()
     
-    # RESUMEN EJECUTIVO (CORREGIDO - manejo defensivo de columnas)
+    # RESUMEN EJECUTIVO (CORREGIDO)
     st.markdown('<div class="section-header">📋 Resumen Ejecutivo</div>', unsafe_allow_html=True)
     
-    # Crear resumen con métricas clave (versión robusta)
+    # Crear resumen con métricas clave
     resumen_data = []
     for ticker in todos_tickers:
         if ticker in datos_tickers and ticker in info_tickers:
             data = datos_tickers[ticker]
             info = info_tickers[ticker]
             
-            last_price = 'N/A'
-            rendimiento_total = np.nan
-            metrics = compute_performance_metrics(data)
-            
-            if not data.empty and 'Close' in data.columns:
-                last_price = data['Close'].iloc[-1]
             if not data.empty and 'Rendimiento_Acumulado' in data.columns:
+                precio_actual = data['Close'].iloc[-1]
                 rendimiento_total = data['Rendimiento_Acumulado'].iloc[-1]
-            
-            market_cap_display = 'N/A'
-            market_cap = info.get('marketCap', None)
-            if isinstance(market_cap, (int, float)):
-                market_cap_display = f"${market_cap/1e9:.1f}B"
-            else:
-                market_cap_display = info.get('marketCap','N/A')
-            
-            resumen_data.append({
-                'Ticker': ticker,
-                'Precio': f"${last_price:.2f}" if isinstance(last_price, (int, float, np.floating)) else 'N/A',
-                'Rendimiento': f"{rendimiento_total:+.2f}%" if not pd.isna(rendimiento_total) else 'N/A',
-                'CAGR': f"{metrics.get('CAGR', np.nan)*100:+.2f}%" if not pd.isna(metrics.get('CAGR', np.nan)) else 'N/A',
-                'Sharpe': f"{metrics.get('Sharpe', np.nan):.2f}" if not pd.isna(metrics.get('Sharpe', np.nan)) else 'N/A',
-                'Max DD': f"{metrics.get('Max Drawdown', np.nan)*100:.2f}%" if not pd.isna(metrics.get('Max Drawdown', np.nan)) else 'N/A',
-                'Market Cap': market_cap_display,
-                'Sector': info.get('sector', 'N/A')
-            })
+                market_cap = info.get('marketCap', 0)
+                pe_ratio = info.get('trailingPE', 'N/A')
+                
+                resumen_data.append({
+                    'Ticker': ticker,
+                    'Precio': f"${precio_actual:.2f}",
+                    'Rendimiento': f"{rendimiento_total:+.2f}%",
+                    'Market Cap': f"${market_cap/1e9:.1f}B",
+                    'P/E': f"{pe_ratio:.1f}" if pe_ratio != 'N/A' else 'N/A',
+                    'Sector': info.get('sector', 'N/A')
+                })
     
     if resumen_data:
         df_resumen = pd.DataFrame(resumen_data)
         
-        # Aplicar formato solo a las columnas presentes (evita KeyError)
-        expected_cols = ['Precio','Rendimiento','CAGR','Sharpe','Max DD']
-        subset_cols = [c for c in expected_cols if c in df_resumen.columns]
-        if subset_cols:
-            styled_df = df_resumen.style.applymap(
-                lambda val: 'background-color: #d4edda; color: #155724;' if isinstance(val, str) and val.startswith('+') else
-                            ('background-color: #f8d7da; color: #721c24;' if isinstance(val, str) and val.startswith('-') else ''),
-                subset=['Rendimiento'] if 'Rendimiento' in df_resumen.columns else None
-            )
-            st.dataframe(styled_df, use_container_width=True, height=200)
-        else:
-            st.dataframe(df_resumen, use_container_width=True, height=200)
+        # Función para aplicar colores al rendimiento
+        def color_rendimiento(val):
+            if '%' in str(val):
+                try:
+                    num = float(str(val).replace('%', '').replace('+', ''))
+                    if num > 0:
+                        return 'background-color: #d4edda; color: #155724;'
+                    elif num < 0:
+                        return 'background-color: #f8d7da; color: #721c24;'
+                except:
+                    pass
+            return ''
+        
+        styled_df = df_resumen.style.applymap(color_rendimiento, subset=['Rendimiento'])
+        st.dataframe(styled_df, use_container_width=True, height=200)
     
     # GRÁFICOS PRINCIPALES CON MATPLOTLIB
     col_graf1, col_graf2 = st.columns(2)
@@ -639,8 +597,6 @@ try:
         colores = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
         
         for i, (ticker, data) in enumerate(datos_tickers.items()):
-            if data is None or data.empty:
-                continue
             color = colores[i % len(colores)]
             
             # Muestreo para mejor performance
@@ -668,8 +624,6 @@ try:
         fig, ax = plt.subplots(figsize=(14, 7))
         
         for i, (ticker, data) in enumerate(datos_tickers.items()):
-            if data is None or data.empty:
-                continue
             color = colores[i % len(colores)]
             
             if len(data) > 100:
