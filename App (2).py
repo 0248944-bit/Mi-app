@@ -8,6 +8,52 @@ import google.generativeai as genai
 import matplotlib.dates as mdates
 import numpy as np
 
+import os
+import streamlit as st
+
+st.sidebar.markdown("### 🔍 DIAGNÓSTICO SECRETS")
+
+# 1. Verificar estructura de carpetas
+st.sidebar.write("**📁 Estructura de carpetas:**")
+current_dir = os.getcwd()
+st.sidebar.write(f"Directorio actual: `{current_dir}`")
+
+secrets_path = ".streamlit/secrets.toml"
+secrets_exists = os.path.exists(secrets_path)
+st.sidebar.write(f"¿`{secrets_path}` existe?: **{secrets_exists}**")
+
+if secrets_exists:
+    st.sidebar.success("✅ Archivo secrets.toml encontrado")
+    # Leer contenido directamente
+    try:
+        with open(secrets_path, 'r') as f:
+            content = f.read()
+        st.sidebar.write(f"Contenido del archivo: `{content.strip()}`")
+    except Exception as e:
+        st.sidebar.error(f"Error leyendo archivo: {e}")
+else:
+    st.sidebar.error("❌ Archivo secrets.toml NO encontrado")
+
+# 2. Verificar secrets de Streamlit
+st.sidebar.write("**🔑 Secrets de Streamlit:**")
+try:
+    all_secrets = list(st.secrets.keys())
+    st.sidebar.write(f"Todos los secrets: `{all_secrets}`")
+    
+    if "GEMINI_API_KEY" in st.secrets:
+        api_key = st.secrets["GEMINI_API_KEY"]
+        st.sidebar.success(f"✅ GEMINI_API_KEY encontrada")
+        st.sidebar.write(f"Longitud: {len(api_key)} caracteres")
+        st.sidebar.write(f"Primeros 10 chars: `{api_key[:10]}...`")
+    else:
+        st.sidebar.error("❌ GEMINI_API_KEY NO en st.secrets")
+        
+except Exception as e:
+    st.sidebar.error(f"Error accediendo secrets: {e}")
+
+# 3. Verificar ubicación de la app
+st.sidebar.write("**📍 Ubicación de la app:**")
+st.sidebar.write(f"Archivo actual: `{__file__}`")
 # Configuración de la página (debe ser lo primero)
 st.set_page_config(
     page_title="FinAnalyzer Pro - Análisis Financiero Inteligente",
