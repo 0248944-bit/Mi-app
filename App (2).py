@@ -4,9 +4,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime, timedelta
+from google import genai
 import matplotlib.dates as mdates
 import numpy as np
-import os
 
 # Configuración de la página (debe ser lo primero)
 st.set_page_config(
@@ -19,8 +19,8 @@ st.set_page_config(
 # Título de la app
 st.title("📊 FinAnalyzer Pro - Análisis Financiero Inteligente")
 
-# 🔑 CLIENTE: REEMPLAZA ESTA LÍNEA CON TU API KEY REAL
-API_KEY = "AIzaSyC2Tgi1fsszmLTaLdeA2QSFX6a1IltBHw0" 
+# Clave de API de Gemini
+API_KEY = "AIzaSyCMqbyl7yrGtY-Os1BPgoOJpRnX49E_Wv0"
 
 # Estilos CSS mejorados
 st.markdown("""
@@ -161,68 +161,19 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Configuración de Gemini (SINTAXIS CORREGIDA)
+# Configuración de Gemini 
 try:
-    import google.generativeai as genai
-    
-    # Verificación crítica de API Key (ASUMIENDO QUE API_KEY YA ESTÁ DEFINIDA)
-    if not API_KEY or API_KEY.startswith("AIzaSyColoca") or "AquiTuApiKey" in API_KEY or "your_api_key_here" in API_KEY:
-        st.sidebar.error("""
-        🔑 ERROR: API Key no configurada correctamente
-        
-        **Para solucionar:**
-        1. Ve a https://aistudio.google.com/
-        2. Crea una API Key
-        3. Reemplaza el valor de API_KEY con tu clave real
-        4. La clave debe empezar con: AIzaSy...
-        """)
-        gemini_configured = False
-        model = None
-    else:
-        # Configurar Gemini
-        genai.configure(api_key=API_KEY)
-        
-        # Intentar conexión con modelo simple
-        try:
-            model = genai.GenerativeModel('gemini-pro')
-            test_response = model.generate_content("Test de conexión")
-            gemini_configured = True
-            st.sidebar.success("✅ Gemini configurado correctamente")
-            
-        except Exception as api_error:
-            error_msg = str(api_error)
-            if "API_KEY_INVALID" in error_msg:
-                st.sidebar.error("❌ API Key inválida. Verifica tu clave.")
-            elif "quota" in error_msg.lower() or "billing" in error_msg.lower():
-                st.sidebar.error("""
-                ❌ Error de facturación/cuota
-                
-                **Soluciones:**
-                1. Configura facturación en Google Cloud Console
-                2. Verifica que tengas créditos disponibles
-                3. Habilita la API de Gemini
-                """)
-            elif "404" in error_msg or "not found" in error_msg.lower():
-                st.sidebar.error("""
-                ❌ Error 404: Modelo no encontrado
-                
-                **Soluciones:**
-                1. Actualiza la librería: `pip install --upgrade google-generativeai`
-                2. Verifica que la API de Gemini esté habilitada
-                3. Asegúrate de tener facturación configurada en Google Cloud
-                """)
-            elif "429" in error_msg or "rate limit" in error_msg.lower():
-                st.sidebar.error("❌ Límite de tasa excedido. Espera unos minutos.")
-            else:
-                st.sidebar.error(f"❌ Error de Gemini: {error_msg}")
-            
-            gemini_configured = False
-            model = None
-
+    client = genai.Client(api_key=API_KEY)  
+    gemini_configured = True
 except Exception as e:
-    st.sidebar.error(f"❌ Error general: {str(e)}")
-    gemini_configured = False
-    model = None
+    try:
+        from google import genai
+        client = genai.Client(api_key=API_KEY)
+        gemini_configured = True
+    except Exception as e2:
+        st.sidebar.warning(f"⚠️ Error configurando Gemini: {e2}")
+        client = None
+        gemini_configured = False
 
 # HEADER PRINCIPAL MEJORADO
 col1, col2, col3 = st.columns([1, 2, 1])
@@ -311,7 +262,7 @@ periodo_map = {
 }
 fecha_inicio = fecha_actual - periodo_map[periodo]
 
-# FUNCIÓN FALTANTE: calcular_rendimientos (ERROR CRÍTICO)
+# Función para calcular rendimientos porcentuales (CORREGIDA)
 def calcular_rendimientos(data):
     """
     Calcula los rendimientos porcentuales diarios y acumulados
@@ -344,10 +295,6 @@ def obtener_analisis_ia(tickers, info_tickers, datos_tickers):
     Obtiene análisis comparativo de Gemini basado en la información fundamental
     """
     try:
-        # VERIFICACIÓN CORREGIDA:
-        if not gemini_configured or model is None:
-            return "❌ Error: Gemini no está configurado correctamente. Verifica tu API Key en la barra lateral."
-        
         # Construir prompt con información de todas las empresas
         prompt = """
         Eres un analista financiero senior. Analiza las siguientes empresas y proporciona un análisis completo:
@@ -405,114 +352,73 @@ def obtener_analisis_ia(tickers, info_tickers, datos_tickers):
         """
         
         with st.spinner('🤖 Gemini está realizando análisis...'):
-            response = model.generate_content(prompt)
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=prompt
+            )
         
         return response.text
         
     except Exception as e:
         return f"❌ Error al obtener análisis de IA: {str(e)}"
 
-# Función para descargar y procesar datos (MEJORADA)
+# Función para descargar y procesar datos (CORREGIDA)
 def descargar_datos(ticker, fecha_inicio, fecha_actual):
     try:
         with st.spinner(f'📥 Descargando {ticker}...'):
-            # Intentar descargar con diferentes formatos de fecha
-            data = yf.download(
-                ticker, 
-                start=fecha_inicio, 
-                end=fecha_actual, 
-                interval='1d',
-                progress=False,
-                auto_adjust=True
-            )
+            data = yf.download(ticker, start=fecha_inicio.strftime('%Y-%m-%d'), 
+                              end=fecha_actual.strftime('%Y-%m-%d'), interval='1d')
         
         if data.empty:
-            st.warning(f"⚠️ No se encontraron datos para {ticker}")
             return None
         
-        # Procesar datos - manejo más robusto
+        # Procesar datos
         data = data.reset_index()
-        
-        # Verificar si es MultiIndex y aplanar
         if isinstance(data.columns, pd.MultiIndex):
-            data.columns = ['_'.join(col).strip('_') if col[1] != '' else col[0] for col in data.columns]
+            data.columns = [col[0] if col[1] == '' else f"{col[0]}_{col[1]}" for col in data.columns]
         
-        # Buscar columnas disponibles
-        available_columns = data.columns.tolist()
+        # Mapeo de columnas
+        column_mapping = {'Date': 'Date', 'Open': 'Open', 'High': 'High', 'Low': 'Low', 
+                         'Close': 'Close', 'Volume': 'Volume', 'Adj Close': 'Close'}
         
-        # Mapeo flexible de columnas
         processed_data = pd.DataFrame()
-        
-        # Buscar columna de fecha
-        date_columns = [col for col in available_columns if 'date' in col.lower() or 'Date' in col]
-        if date_columns:
-            processed_data['Date'] = data[date_columns[0]]
-        else:
-            # Si no hay columna de fecha, usar el índice
-            processed_data['Date'] = data.index
-        
-        # Buscar columna de precio de cierre
-        close_columns = [col for col in available_columns if 'close' in col.lower() or 'Close' in col]
-        if close_columns:
-            processed_data['Close'] = data[close_columns[0]]
-        else:
-            st.warning(f"❌ No se encontró columna Close para {ticker}")
-            return None
-        
-        # Buscar otras columnas opcionales
-        for col_name, search_terms in [
-            ('Open', ['open']),
-            ('High', ['high']), 
-            ('Low', ['low']),
-            ('Volume', ['volume'])
-        ]:
-            matching_cols = [col for col in available_columns if any(term in col.lower() for term in search_terms)]
-            if matching_cols:
-                processed_data[col_name] = data[matching_cols[0]]
+        for standard_name, possible_names in column_mapping.items():
+            for col_name in data.columns:
+                if col_name in possible_names or col_name.startswith(possible_names + '_'):
+                    processed_data[standard_name] = data[col_name]
+                    break
         
         data = processed_data
-        data['Date'] = pd.to_datetime(data['Date'], errors='coerce')
+        data['Date'] = pd.to_datetime(data['Date'])
         
         # Convertir columnas numéricas de forma segura
-        numeric_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
-        for col in numeric_columns:
+        for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
             if col in data.columns:
                 data[col] = pd.to_numeric(data[col], errors='coerce')
         
-        # Eliminar filas con valores nulos en columnas críticas
-        data = data.dropna(subset=['Date', 'Close'])
-        
-        if data.empty:
-            st.warning(f"⚠️ Datos insuficientes después de limpieza para {ticker}")
-            return None
+        data = data.dropna()
         
         # Calcular rendimientos
-        data = calcular_rendimientos(data)
+        if not data.empty:
+            data = calcular_rendimientos(data)
         
         return data
-        
     except Exception as e:
-        st.error(f"❌ Error descargando {ticker}: {str(e)}")
+        st.error(f"Error descargando {ticker}: {e}")
         return None
 
-# Función para obtener información de la empresa (MEJORADA)
+# Función para obtener información de la empresa
 def obtener_info_empresa(ticker):
     try:
         with st.spinner(f'🔍 Obteniendo información de {ticker}...'):
             ticker_obj = yf.Ticker(ticker)
             info = ticker_obj.info
-            
-            # Verificar si la información es válida
-            if not info or len(info) < 5:
-                st.warning(f"⚠️ Información limitada para {ticker}")
-                return {'longName': ticker, 'sector': 'N/A'}
-                
         return info
     except Exception as e:
-        st.error(f"❌ Error obteniendo información de {ticker}: {str(e)}")
-        return {'longName': ticker, 'sector': 'N/A'}
+        st.error(f"Error obteniendo información de {ticker}: {e}")
+        return {}
 
-# Función para mostrar tarjeta de métricas
+# Función para mostrar tarjeta de métricas (CORREGIDA)
 def mostrar_metric_card(label, value, delta=None):
     # Limpiar el valor si es un string con porcentaje
     if isinstance(value, str) and '%' in value:
@@ -526,16 +432,16 @@ def mostrar_metric_card(label, value, delta=None):
     
     st.metric(label=label, value=value, delta=delta)
 
-# Función para mostrar información corporativa
+# Función para mostrar información corporativa (CORREGIDA)
 def mostrar_info_corporativa(ticker, info, es_principal=True):
     if es_principal:
         st.markdown(f'<div class="section-header">🏢 {ticker} - Información Corporativa</div>', unsafe_allow_html=True)
     else:
-        st.markdown('<div class="company-section">', unsafe_allow_html=True)
+        st.markdown(f'<div class="company-section">')
         st.markdown(f'<h3 style="color: #1f77b4; margin-bottom: 1.5rem;">🏢 {ticker} - Información Corporativa</h3>', unsafe_allow_html=True)
     
     # Header de la empresa
-    nombre = info.get("longName", ticker)
+    nombre = info.get("longName", "No disponible")
     st.markdown(f"### {nombre}")
     
     # Métricas principales en cards
@@ -543,22 +449,16 @@ def mostrar_info_corporativa(ticker, info, es_principal=True):
     
     with col1:
         market_cap = info.get('marketCap', 0)
-        if market_cap > 0:
-            mostrar_metric_card("💰 Capitalización", f"${market_cap/1e9:.2f}B")
-        else:
-            mostrar_metric_card("💰 Capitalización", "N/A")
+        mostrar_metric_card("💰 Capitalización", f"${market_cap/1e9:.2f}B")
     
     with col2:
         pe_ratio = info.get('trailingPE', 'N/A')
-        pe_display = f"{pe_ratio:.1f}" if pe_ratio != 'N/A' and pe_ratio is not None else 'N/A'
+        pe_display = f"{pe_ratio:.1f}" if pe_ratio != 'N/A' else 'N/A'
         mostrar_metric_card("📊 P/E Ratio", pe_display)
     
     with col3:
-        dividend_yield = info.get('dividendYield', 0)
-        if dividend_yield and dividend_yield > 0:
-            mostrar_metric_card("💸 Dividend Yield", f"{dividend_yield*100:.2f}%")
-        else:
-            mostrar_metric_card("💸 Dividend Yield", "0%")
+        dividend_yield = info.get('dividendYield', 0) * 100
+        mostrar_metric_card("💸 Dividend Yield", f"{dividend_yield:.2f}%")
     
     with col4:
         sector = info.get('sector', 'N/A')
@@ -569,31 +469,25 @@ def mostrar_info_corporativa(ticker, info, es_principal=True):
     
     with col5:
         beta = info.get('beta', 'N/A')
-        beta_display = f"{beta:.2f}" if beta != 'N/A' and beta is not None else 'N/A'
+        beta_display = f"{beta:.2f}" if beta != 'N/A' else 'N/A'
         mostrar_metric_card("📈 Beta", beta_display)
     
     with col6:
-        profit_margin = info.get('profitMargins', 0)
-        if profit_margin:
-            mostrar_metric_card("🎯 Margen Beneficio", f"{profit_margin*100:.1f}%")
-        else:
-            mostrar_metric_card("🎯 Margen Beneficio", "N/A")
+        profit_margin = info.get('profitMargins', 0) * 100
+        mostrar_metric_card("🎯 Margen Beneficio", f"{profit_margin:.1f}%")
     
     with col7:
-        roe = info.get('returnOnEquity', 0)
-        if roe:
-            mostrar_metric_card("🚀 ROE", f"{roe*100:.1f}%")
-        else:
-            mostrar_metric_card("🚀 ROE", "N/A")
+        roe = info.get('returnOnEquity', 0) * 100
+        mostrar_metric_card("🚀 ROE", f"{roe:.1f}%")
     
     with col8:
         employees = info.get('fullTimeEmployees', 'N/A')
-        emp_display = f"{employees:,}" if employees != 'N/A' and employees else 'N/A'
+        emp_display = f"{employees:,}" if employees != 'N/A' else 'N/A'
         mostrar_metric_card("👥 Empleados", emp_display)
     
     # Descripción de la empresa
     descripcion = info.get("longBusinessSummary", "No disponible")
-    if descripcion != "No disponible" and descripcion:
+    if descripcion != "No disponible":
         st.markdown("#### 📝 Descripción de la Empresa")
         st.markdown(f'<div class="info-box">{descripcion[:800]}...</div>', unsafe_allow_html=True)
     
@@ -603,11 +497,7 @@ def mostrar_info_corporativa(ticker, info, es_principal=True):
 # CONTENIDO PRINCIPAL
 try:
     # Lista de todos los tickers a procesar
-    todos_tickers = [stonk] + tickers_comparar if stonk else []
-    
-    if not todos_tickers:
-        st.error("❌ Ingresa al menos un ticker válido")
-        st.stop()
+    todos_tickers = [stonk] + tickers_comparar
     
     # Mostrar progreso de descarga
     with st.status("📥 Descargando datos de mercado...", expanded=True) as status:
@@ -616,38 +506,28 @@ try:
         # Descargar datos para todos los tickers
         datos_tickers = {}
         info_tickers = {}
-        tickers_exitosos = 0
         
         progress_bar = st.progress(0)
         for i, ticker in enumerate(todos_tickers):
             st.write(f"📊 Procesando {ticker}...")
             data = descargar_datos(ticker, fecha_inicio, fecha_actual)
-            if data is not None and not data.empty:
+            if data is not None:
                 datos_tickers[ticker] = data
                 info_tickers[ticker] = obtener_info_empresa(ticker)
                 st.success(f"✅ {ticker} - Datos descargados correctamente")
-                tickers_exitosos += 1
             else:
                 st.error(f"❌ {ticker} - Error en descarga")
             
             progress_bar.progress((i + 1) / len(todos_tickers))
         
-        status.update(label=f"✅ {tickers_exitosos}/{len(todos_tickers)} tickers descargados", state="complete", expanded=False)
+        status.update(label="✅ ¡Todos los datos descargados!", state="complete", expanded=False)
     
     if not datos_tickers:
-        st.error("""
-        ❌ No se encontraron datos para ningún ticker ingresado
-        
-        **Posibles soluciones:**
-        - Verifica que los tickers sean válidos (ej: AAPL, MSFT, GOOGL)
-        - Revisa tu conexión a internet
-        - Intenta con tickers más populares
-        - Prueba con un período de tiempo diferente
-        """)
+        st.error("❌ No se encontraron datos para ningún ticker ingresado")
         st.stop()
     
     # SECCIÓN: ANÁLISIS DE IA (si se solicitó)
-    if st.session_state.get('analisis_ia', False) and gemini_configured and model is not None:
+    if st.session_state.get('analisis_ia', False) and gemini_configured:
         st.markdown('<div class="section-header">🤖 Análisis Inteligente por IA</div>', unsafe_allow_html=True)
         
         with st.spinner('🚀 Ejecutando análisis avanzado con Gemini...'):
@@ -662,7 +542,7 @@ try:
                 st.session_state.analisis_ia = False
                 st.rerun()
     
-    # RESUMEN EJECUTIVO
+    # RESUMEN EJECUTIVO (CORREGIDO)
     st.markdown('<div class="section-header">📋 Resumen Ejecutivo</div>', unsafe_allow_html=True)
     
     # Crear resumen con métricas clave
@@ -672,23 +552,20 @@ try:
             data = datos_tickers[ticker]
             info = info_tickers[ticker]
             
-            if not data.empty and 'Rendimiento_Acumulado' in data.columns and len(data) > 0:
-                try:
-                    precio_actual = data['Close'].iloc[-1]
-                    rendimiento_total = data['Rendimiento_Acumulado'].iloc[-1]
-                    market_cap = info.get('marketCap', 0)
-                    pe_ratio = info.get('trailingPE', 'N/A')
-                    
-                    resumen_data.append({
-                        'Ticker': ticker,
-                        'Precio': f"${precio_actual:.2f}",
-                        'Rendimiento': f"{rendimiento_total:+.2f}%",
-                        'Market Cap': f"${market_cap/1e9:.1f}B" if market_cap > 0 else 'N/A',
-                        'P/E': f"{pe_ratio:.1f}" if pe_ratio != 'N/A' and pe_ratio is not None else 'N/A',
-                        'Sector': info.get('sector', 'N/A')
-                    })
-                except Exception as e:
-                    st.warning(f"⚠️ Error procesando datos de {ticker}: {e}")
+            if not data.empty and 'Rendimiento_Acumulado' in data.columns:
+                precio_actual = data['Close'].iloc[-1]
+                rendimiento_total = data['Rendimiento_Acumulado'].iloc[-1]
+                market_cap = info.get('marketCap', 0)
+                pe_ratio = info.get('trailingPE', 'N/A')
+                
+                resumen_data.append({
+                    'Ticker': ticker,
+                    'Precio': f"${precio_actual:.2f}",
+                    'Rendimiento': f"{rendimiento_total:+.2f}%",
+                    'Market Cap': f"${market_cap/1e9:.1f}B",
+                    'P/E': f"{pe_ratio:.1f}" if pe_ratio != 'N/A' else 'N/A',
+                    'Sector': info.get('sector', 'N/A')
+                })
     
     if resumen_data:
         df_resumen = pd.DataFrame(resumen_data)
@@ -708,82 +585,93 @@ try:
         
         styled_df = df_resumen.style.applymap(color_rendimiento, subset=['Rendimiento'])
         st.dataframe(styled_df, use_container_width=True, height=200)
-    else:
-        st.warning("⚠️ No hay datos suficientes para mostrar el resumen ejecutivo")
     
     # GRÁFICOS PRINCIPALES CON MATPLOTLIB
-    if len(datos_tickers) > 0:
-        col_graf1, col_graf2 = st.columns(2)
+    col_graf1, col_graf2 = st.columns(2)
+    
+    with col_graf1:
+        st.markdown('<div class="section-header">📈 Comparación de Precios</div>', unsafe_allow_html=True)
         
-        with col_graf1:
-            st.markdown('<div class="section-header">📈 Comparación de Precios</div>', unsafe_allow_html=True)
-            
-            fig, ax = plt.subplots(figsize=(14, 7))
-            
-            colores = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
-            
-            for i, (ticker, data) in enumerate(datos_tickers.items()):
-                color = colores[i % len(colores)]
-                
-                if len(data) > 0:
-                    # Muestreo para mejor performance
-                    if len(data) > 100:
-                        data_plot = data.iloc[::max(1, len(data)//100)]
-                    else:
-                        data_plot = data
-                    
-                    ax.plot(data_plot['Date'], data_plot['Close'], 
-                           label=ticker, color=color, linewidth=2.5, alpha=0.8)
-            
-            ax.set_title(f"Evolución de Precios - {periodo}", fontsize=16, fontweight='bold', pad=20)
-            ax.set_xlabel("Fecha", fontsize=12)
-            ax.set_ylabel("Precio (USD)", fontsize=12)
-            ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-            ax.grid(True, alpha=0.3)
-            ax.tick_params(axis='x', rotation=45)
-            plt.tight_layout()
-            
-            st.pyplot(fig)
+        fig, ax = plt.subplots(figsize=(14, 7))
         
-        with col_graf2:
-            st.markdown('<div class="section-header">📊 Rendimientos Acumulados</div>', unsafe_allow_html=True)
+        colores = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
+        
+        for i, (ticker, data) in enumerate(datos_tickers.items()):
+            color = colores[i % len(colores)]
             
-            fig, ax = plt.subplots(figsize=(14, 7))
+            # Muestreo para mejor performance
+            if len(data) > 100:
+                data_plot = data.iloc[::5]
+            else:
+                data_plot = data
             
-            for i, (ticker, data) in enumerate(datos_tickers.items()):
-                color = colores[i % len(colores)]
-                
-                if len(data) > 0 and 'Rendimiento_Acumulado' in data.columns:
-                    # Muestreo para mejor performance
-                    if len(data) > 100:
-                        data_plot = data.iloc[::max(1, len(data)//100)]
-                    else:
-                        data_plot = data
-                    
-                    ax.plot(data_plot['Date'], data_plot['Rendimiento_Acumulado'], 
-                           label=ticker, color=color, linewidth=2.5, alpha=0.8)
+            ax.plot(data_plot['Date'], data_plot['Close'], 
+                   label=ticker, color=color, linewidth=2.5, alpha=0.8)
+        
+        ax.set_title(f"Evolución de Precios - {periodo}", fontsize=16, fontweight='bold', pad=20)
+        ax.set_xlabel("Fecha", fontsize=12)
+        ax.set_ylabel("Precio (USD)", fontsize=12)
+        ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        ax.grid(True, alpha=0.3)
+        ax.tick_params(axis='x', rotation=45)
+        plt.tight_layout()
+        
+        st.pyplot(fig)
+    
+    with col_graf2:
+        st.markdown('<div class="section-header">📊 Rendimientos Acumulados</div>', unsafe_allow_html=True)
+        
+        fig, ax = plt.subplots(figsize=(14, 7))
+        
+        for i, (ticker, data) in enumerate(datos_tickers.items()):
+            color = colores[i % len(colores)]
             
-            ax.axhline(y=0, color='black', linestyle='--', alpha=0.5, linewidth=1)
-            ax.set_title(f"Rendimientos Acumulados - {periodo}", fontsize=16, fontweight='bold', pad=20)
-            ax.set_xlabel("Fecha", fontsize=12)
-            ax.set_ylabel("Rendimiento (%)", fontsize=12)
-            ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-            ax.grid(True, alpha=0.3)
-            ax.tick_params(axis='x', rotation=45)
-            plt.tight_layout()
+            if len(data) > 100:
+                data_plot = data.iloc[::5]
+            else:
+                data_plot = data
             
-            st.pyplot(fig)
+            if 'Rendimiento_Acumulado' in data_plot.columns:
+                ax.plot(data_plot['Date'], data_plot['Rendimiento_Acumulado'], 
+                       label=ticker, color=color, linewidth=2.5, alpha=0.8)
+        
+        ax.axhline(y=0, color='black', linestyle='--', alpha=0.5, linewidth=1)
+        ax.set_title(f"Rendimientos Acumulados - {periodo}", fontsize=16, fontweight='bold', pad=20)
+        ax.set_xlabel("Fecha", fontsize=12)
+        ax.set_ylabel("Rendimiento (%)", fontsize=12)
+        ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        ax.grid(True, alpha=0.3)
+        ax.tick_params(axis='x', rotation=45)
+        plt.tight_layout()
+        
+        st.pyplot(fig)
     
     # INFORMACIÓN DETALLADA POR EMPRESA
-    if info_tickers:
-        st.markdown('<div class="section-header">🏢 Análisis por Empresa</div>', unsafe_allow_html=True)
-        
-        # Usar pestañas para cada empresa
-        tabs = st.tabs([f"📊 {ticker}" for ticker in info_tickers.keys()])
-        
-        for i, (ticker, info) in enumerate(info_tickers.items()):
-            with tabs[i]:
-                mostrar_info_corporativa(ticker, info, es_principal=(i == 0))
+    st.markdown('<div class="section-header">🏢 Análisis por Empresa</div>', unsafe_allow_html=True)
+    
+    # Usar pestañas para cada empresa
+    tabs = st.tabs([f"📊 {ticker}" for ticker in todos_tickers if ticker in info_tickers])
+    
+    for i, ticker in enumerate([t for t in todos_tickers if t in info_tickers]):
+        with tabs[i]:
+            if ticker in info_tickers and info_tickers[ticker]:
+                mostrar_info_corporativa(ticker, info_tickers[ticker], es_principal=(i == 0))
+    
+    # FOOTER MEJORADO
+    st.markdown("---")
+    st.markdown("""
+    <div style='text-align: center; color: #6c757d; padding: 3rem; background: linear-gradient(135deg, #f8f9fa, #e9ecef); 
+                border-radius: 15px; margin-top: 2rem;'>
+        <h3 style='color: #1f77b4; margin-bottom: 1rem;'>🚀 FinAnalyzer Pro</h3>
+        <p style='margin-bottom: 0.5rem;'><strong>Plataforma de análisis financiero avanzado</strong></p>
+        <p style='margin-bottom: 1rem; font-size: 0.9rem;'>
+            Desarrollado con Streamlit • Integración con Yahoo Finance • Análisis IA con Gemini
+        </p>
+        <p style='margin-top: 1.5rem; font-size: 0.8rem; color: #868e96;'>
+            Última actualización: {} | © 2024 FinAnalyzer Pro
+        </p>
+    </div>
+    """.format(fecha_actual.strftime('%Y-%m-%d %H:%M:%S')), unsafe_allow_html=True)
 
 except Exception as e:
     st.error(f"""
@@ -791,23 +679,6 @@ except Exception as e:
     
     **Solución de problemas:**
     - Verifica tu conexión a internet
-    - Revisa que los tickers sean válidos (ej: AAPL, MSFT, GOOGL)
+    - Revisa que los tickers sean válidos
     - Intenta con un período de tiempo más corto
-    - Recarga la página
     """)
-
-# FOOTER MEJORADO
-st.markdown("---")
-st.markdown("""
-<div style='text-align: center; color: #6c757d; padding: 3rem; background: linear-gradient(135deg, #f8f9fa, #e9ecef); 
-            border-radius: 15px; margin-top: 2rem;'>
-    <h3 style='color: #1f77b4; margin-bottom: 1rem;'>🚀 FinAnalyzer Pro</h3>
-    <p style='margin-bottom: 0.5rem;'><strong>Plataforma de análisis financiero avanzado</strong></p>
-    <p style='margin-bottom: 1rem; font-size: 0.9rem;'>
-        Desarrollado con Streamlit • Integración con Yahoo Finance • Análisis IA con Gemini
-    </p>
-    <p style='margin-top: 1.5rem; font-size: 0.8rem; color: #868e96;'>
-        Última actualización: {} | © 2024 FinAnalyzer Pro
-    </p>
-</div>
-""".format(datetime.now().strftime('%Y-%m-%d %H:%M:%S')), unsafe_allow_html=True)
