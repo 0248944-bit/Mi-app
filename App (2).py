@@ -62,23 +62,43 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- Gemini configuration (safe) ---
+import os
+
 gemini_configured = False
 model = None
-if genai is not None:
+
+try:
+    import google.generativeai as genai  # type: ignore
+except Exception:
+    genai = None
+
+if genai is None:
+    st.sidebar.warning("Gemini SDK no instalado; análisis IA deshabilitado")
+else:
+    # Primero intenta st.secrets, luego ENV
+    API_KEY = None
     try:
-        API_KEY = st.secrets.get("GEMINI_API_KEY", None)
-        if API_KEY:
+        API_KEY = st.secrets.get("GEMINI_API_KEY")  # safe get
+    except Exception:
+        API_KEY = None
+
+    if not API_KEY:
+        # fallback a variable de entorno
+        API_KEY = os.getenv("GEMINI_API_KEY")
+
+    if not API_KEY:
+        st.sidebar.error("⚠️ GEMINI_API_KEY no encontrada en st.secrets ni en la variable de entorno GEMINI_API_KEY")
+        gemini_configured = False
+    else:
+        try:
             genai.configure(api_key=API_KEY)
-            # No todas las instalaciones tendrán este objeto; se usa condicionalmente
             model = genai.GenerativeModel('gemini-1.5-flash')
             gemini_configured = True
             st.sidebar.success("✅ Gemini configurado correctamente")
-        else:
-            st.sidebar.warning("⚠️ GEMINI_API_KEY no encontrada en st.secrets")
-    except Exception as e:
-        st.sidebar.warning(f"Error configurando Gemini: {e}")
-else:
-    st.sidebar.info("Gemini SDK no instalado; análisis IA deshabilitado")
+        except Exception as e:
+            st.sidebar.error(f"Error configurando Gemini: {e}")
+            gemini_configured = False
+            model = None
 
 # HEADER
 col1, col2, col3 = st.columns([1, 2, 1])
