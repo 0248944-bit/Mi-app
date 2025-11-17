@@ -64,19 +64,41 @@ st.markdown("""
 # --- Gemini configuration (safe) ---
 gemini_configured = False
 model = None
+
+# Debug temporal - QUITA ESTO DESPUÉS
+try:
+    st.sidebar.write("🔍 Debug - Secrets disponibles:", list(st.secrets.keys()))
+except:
+    pass
+
 if genai is not None:
     try:
-        API_KEY = st.secrets.get("GEMINI_API_KEY", None)
-        if API_KEY:
-            genai.configure(api_key=API_KEY)
-            # No todas las instalaciones tendrán este objeto; se usa condicionalmente
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            gemini_configured = True
-            st.sidebar.success("✅ Gemini configurado correctamente")
+        # ✅ FORMA CORRECTA de verificar secrets
+        if "GEMINI_API_KEY" in st.secrets:
+            API_KEY = st.secrets["GEMINI_API_KEY"]
+            
+            # Verificar que la API key no esté vacía
+            if API_KEY and API_KEY.strip():
+                genai.configure(api_key=API_KEY)
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                gemini_configured = True
+                st.sidebar.success("✅ Gemini configurado correctamente")
+            else:
+                st.sidebar.error("❌ GEMINI_API_KEY está vacía en secrets.toml")
         else:
-            st.sidebar.warning("⚠️ GEMINI_API_KEY no encontrada en st.secrets")
+            st.sidebar.error("""
+            ❌ GEMINI_API_KEY no encontrada en secrets
+            
+            **Para solucionar:**
+            1. Verifica que el archivo `.streamlit/secrets.toml` existe
+            2. Contenido debe ser:
+            ```toml
+            GEMINI_API_KEY = "tu-api-key-real"
+            ```
+            3. Reinicia la app: **Ctrl+C** y `streamlit run app.py`
+            """)
     except Exception as e:
-        st.sidebar.warning(f"Error configurando Gemini: {e}")
+        st.sidebar.error(f"❌ Error configurando Gemini: {e}")
 else:
     st.sidebar.info("Gemini SDK no instalado; análisis IA deshabilitado")
 
@@ -441,7 +463,7 @@ if len(todos_tickers) >= 1:
         st.json(port_metrics)
 
 # Análisis IA (limitado por tokens y número de tickers)
-if st.session_state.get('analisis_ia', False) and gemini_configured:
+if st.session_state.get('analisis_ia', False) and gemini_configured and model is not None:
     st.markdown('<div class="section-header">🤖 Análisis IA (Gemini)</div>', unsafe_allow_html=True)
     # Construir prompt acotado
     limited_tickers = todos_tickers[:max_tickers]
