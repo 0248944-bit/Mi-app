@@ -165,11 +165,15 @@ st.markdown("""
 try:
     import google.generativeai as genai
     genai.configure(api_key=API_KEY)
-    model = genai.GenerativeModel('gemini-pro')
+    
+    # Usar el modelo que SÍ funciona
+    model = genai.GenerativeModel('gemini-1.5-flash')
     gemini_configured = True
     
+    st.sidebar.success("✅ Gemini configurado correctamente")
+    
 except Exception as e:
-    st.sidebar.warning(f"⚠️ Error configurando Gemini: {e}")
+    st.sidebar.error(f"❌ Error configurando Gemini: {str(e)}")
     model = None
     gemini_configured = False
 
@@ -293,6 +297,10 @@ def obtener_analisis_ia(tickers, info_tickers, datos_tickers):
     Obtiene análisis comparativo de Gemini basado en la información fundamental
     """
     try:
+        # Verificar que el modelo esté disponible
+        if model is None:
+            return "❌ Error: Modelo de Gemini no configurado correctamente"
+        
         # Construir prompt con información de todas las empresas
         prompt = """
         Eres un analista financiero senior. Analiza las siguientes empresas y proporciona un análisis completo:
