@@ -70,7 +70,7 @@ if genai is not None:
         if API_KEY:
             genai.configure(api_key=API_KEY)
             # No todas las instalaciones tendrán este objeto; se usa condicionalmente
-            model = genai.GenerativeModel('gemini-1.5-flash')
+            model = genai.GenerativeModel('gemini-2.0-flash')
             gemini_configured = True
             st.sidebar.success("✅ Gemini configurado correctamente")
         else:
