@@ -166,14 +166,45 @@ try:
     import google.generativeai as genai
     genai.configure(api_key=API_KEY)
     
-    # Usar el modelo que SÍ funciona
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    gemini_configured = True
+    # Obtener la lista de modelos disponibles
+    modelos_disponibles = []
+    for m in genai.list_models():
+        if 'generateContent' in m.supported_generation_methods:
+            modelos_disponibles.append(m.name)
     
-    st.sidebar.success("✅ Gemini configurado correctamente")
+    st.sidebar.info(f"📋 Modelos disponibles: {len(modelos_disponibles)}")
     
+    # Buscar un modelo que funcione
+    modelo_funcional = None
+    modelos_a_probar = [
+        'models/gemini-1.0-pro',
+        'models/gemini-pro',
+        'models/gemini-1.5-flash-latest',
+        'models/gemini-1.5-pro-latest'
+    ]
+    
+    for modelo in modelos_a_probar:
+        if any(modelo in disponible for disponible in modelos_disponibles):
+            modelo_funcional = modelo
+            break
+    
+    if modelo_funcional:
+        model = genai.GenerativeModel(modelo_funcional)
+        # Probar el modelo
+        test_response = model.generate_content("Hola")
+        gemini_configured = True
+        st.sidebar.success(f"✅ Conectado a: {modelo_funcional}")
+    else:
+        # Usar el primer modelo disponible
+        if modelos_disponibles:
+            model = genai.GenerativeModel(modelos_disponibles[0])
+            gemini_configured = True
+            st.sidebar.success(f"✅ Usando: {modelos_disponibles[0]}")
+        else:
+            raise Exception("No hay modelos disponibles")
+            
 except Exception as e:
-    st.sidebar.error(f"❌ Error configurando Gemini: {str(e)}")
+    st.sidebar.error(f"❌ Error Gemini: {str(e)}")
     model = None
     gemini_configured = False
 
