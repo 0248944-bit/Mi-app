@@ -4,15 +4,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime, timedelta
+import google.generativeai as genai
+import matplotlib.dates as mdates
 import numpy as np
 import io
-import math
-
-# Intenta configurar Gemini, sigue siendo opcional
-try:
-    import google.generativeai as genai  # type: ignore
-except Exception:
-    genai = None
 
 # Configuración de la página (debe ser lo primero)
 st.set_page_config(
@@ -22,9 +17,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Título de la app
 st.title("📊 FinAnalyzer Pro - Análisis Financiero Inteligente")
 
-# --- CSS (como en tu versión original) ---
+# Estilos CSS mejorados
 st.markdown("""
 <style>
     .main-header {
@@ -38,6 +34,7 @@ st.markdown("""
         -webkit-text-fill-color: transparent;
         text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
     }
+    
     .section-header {
         font-size: 2rem !important;
         color: #2e86ab;
@@ -50,6 +47,22 @@ st.markdown("""
         align-items: center;
         gap: 10px;
     }
+    
+    .metric-card {
+        background: linear-gradient(135deg, #ffffff, #f8f9fa);
+        padding: 1.5rem;
+        border-radius: 15px;
+        border-left: 5px solid #1f77b4;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        transition: transform 0.3s ease;
+    }
+    
+    .metric-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+    }
+    
     .info-box {
         background: linear-gradient(135deg, #e8f4f8, #d4edda);
         padding: 2rem;
@@ -58,141 +71,430 @@ st.markdown("""
         margin-bottom: 1.5rem;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
+    
+    .company-section {
+        background: linear-gradient(135deg, #f0f8ff, #e6f3ff);
+        padding: 2rem;
+        border-radius: 20px;
+        border: 3px solid #1f77b4;
+        margin-bottom: 2.5rem;
+        box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+    }
+    
+    .ai-analysis {
+        background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+        padding: 2.5rem;
+        border-radius: 20px;
+        border: 3px solid #ffc107;
+        margin-bottom: 2.5rem;
+        box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+    }
+    
+    .recommendation-box {
+        background: linear-gradient(135deg, #d4edda, #c3e6cb);
+        padding: 2rem;
+        border-radius: 15px;
+        border: 3px solid #28a745;
+        margin-top: 1.5rem;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .warning-box {
+        background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+        padding: 1.5rem;
+        border-radius: 10px;
+        border: 2px solid #dc3545;
+        margin: 1rem 0;
+    }
+    
+    .success-box {
+        background: linear-gradient(135deg, #d1ecf1, #bee5eb);
+        padding: 1.5rem;
+        border-radius: 10px;
+        border: 2px solid #17a2b8;
+        margin: 1rem 0;
+    }
+    
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 2px;
+        background-color: #f0f2f6;
+        padding: 10px;
+        border-radius: 10px;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        height: 60px;
+        white-space: pre-wrap;
+        background-color: #e9ecef;
+        border-radius: 8px;
+        gap: 1px;
+        padding: 15px 20px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #1f77b4, #2e86ab);
+        color: white;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    
+    .stButton button {
+        background: linear-gradient(135deg, #1f77b4, #2e86ab);
+        color: white;
+        font-weight: bold;
+        padding: 12px 30px;
+        border-radius: 10px;
+        border: none;
+        font-size: 1.2rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    
+    .stButton button:hover {
+        background: linear-gradient(135deg, #1668a3, #1a759f);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# --- Gemini configuration (safe) ---
-gemini_configured = False
-model = None
-
-# Debug temporal - QUITA ESTO DESPUÉS
+# CONFIGURACIÓN DE GEMINI (USANDO TU LÓGICA INICIAL - SIN CAMBIOS)
 try:
-    st.sidebar.write("🔍 Debug - Secrets disponibles:", list(st.secrets.keys()))
-except:
-    pass
+    import google.generativeai as genai
+    # ✅ Obtener API key de secrets (misma lógica que tu código inicial)
+    API_KEY = st.secrets["GEMINI_API_KEY"]
+    genai.configure(api_key=API_KEY)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    gemini_configured = True
+    st.sidebar.success("✅ Gemini configurado correctamente")
+except KeyError:
+    st.sidebar.error("❌ API key no encontrada en secrets.toml")
+    gemini_configured = False
+except Exception as e:
+    st.sidebar.warning(f"Error configurando Gemini: {e}")
+    model = None
+    gemini_configured = False
 
-if genai is not None:
-    try:
-        # ✅ FORMA CORRECTA de verificar secrets
-        if "GEMINI_API_KEY" in st.secrets:
-            API_KEY = st.secrets["GEMINI_API_KEY"]
-            
-            # Verificar que la API key no esté vacía
-            if API_KEY and API_KEY.strip():
-                genai.configure(api_key=API_KEY)
-                model = genai.GenerativeModel('gemini-1.5-flash')
-                gemini_configured = True
-                st.sidebar.success("✅ Gemini configurado correctamente")
-            else:
-                st.sidebar.error("❌ GEMINI_API_KEY está vacía en secrets.toml")
-        else:
-            st.sidebar.error("""
-            ❌ GEMINI_API_KEY no encontrada en secrets
-            
-            **Para solucionar:**
-            1. Verifica que el archivo `.streamlit/secrets.toml` existe
-            2. Contenido debe ser:
-            ```toml
-            GEMINI_API_KEY = "tu-api-key-real"
-            ```
-            3. Reinicia la app: **Ctrl+C** y `streamlit run app.py`
-            """)
-    except Exception as e:
-        st.sidebar.error(f"❌ Error configurando Gemini: {e}")
-else:
-    st.sidebar.info("Gemini SDK no instalado; análisis IA deshabilitado")
-
-# HEADER
+# HEADER PRINCIPAL MEJORADO
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
     st.markdown('<div class="main-header">🚀 FinAnalyzer Pro</div>', unsafe_allow_html=True)
-    st.markdown("<div style='text-align:center;color:#6c757d'>Plataforma de análisis financiero inteligente con IA integrada</div>", unsafe_allow_html=True)
+    st.markdown("""
+    <div style='text-align: center; color: #6c757d; font-size: 1.2rem; margin-bottom: 2rem;'>
+        Plataforma de análisis financiero inteligente con IA integrada
+    </div>
+    """, unsafe_allow_html=True)
 
-# SIDEBAR - Inputs mejorados
+# BARRA LATERAL MEJORADA
 with st.sidebar:
-    st.markdown("### ⚙️ Configuración")
-    st.markdown("#### 📈 Acción Principal")
-    stonk = st.text_input("Ticker principal:", value="MSFT")
-    st.markdown("#### 🔄 Comparar con (coma separado)")
-    comparar_tickers = st.text_input("Tickers:", value="AAPL, GOOGL")
-    tickers_comparar = [t.strip().upper() for t in comparar_tickers.split(",") if t.strip()]
-    st.markdown("#### 📅 Rango de Fechas")
-    rango_personalizado = st.checkbox("Usar rango personalizado", value=False)
-    if rango_personalizado:
-        fecha_inicio = st.date_input("Fecha inicio", value=datetime.now().date() - timedelta(days=365))
-        fecha_fin = st.date_input("Fecha fin", value=datetime.now().date())
-        fecha_inicio = datetime.combine(fecha_inicio, datetime.min.time())
-        fecha_actual = datetime.combine(fecha_fin, datetime.max.time())
-    else:
-        periodo = st.selectbox("Selecciona el período", ["1 mes", "3 meses", "6 meses", "1 año", "3 años", "5 años"], index=3)
-        fecha_actual = datetime.now()
-        periodo_map = {
-            "1 mes": timedelta(days=30),
-            "3 meses": timedelta(days=90),
-            "6 meses": timedelta(days=180),
-            "1 año": timedelta(days=365),
-            "3 años": timedelta(days=3*365),
-            "5 años": timedelta(days=5*365)
-        }
-        fecha_inicio = fecha_actual - periodo_map[periodo]
-    st.markdown("#### ⏱️ Intervalo")
-    intervalo = st.selectbox("Intervalo de datos", ["1d", "1wk", "1mo"], index=0)
-    st.markdown("#### 🧾 Opciones")
-    max_tickers = st.slider("Máx tickers para análisis IA (si activado)", min_value=1, max_value=6, value=4)
-    show_indicators = st.checkbox("Mostrar indicadores técnicos (SMA/EMA/MACD/RSI)", value=True)
-    show_correlation = st.checkbox("Mostrar heatmap de correlación", value=True)
-    benchmark = st.text_input("Benchmark (opcional, e.g. ^GSPC)", value="^GSPC")
+    st.markdown("""
+    <div style='text-align: center; padding: 1rem; background: linear-gradient(135deg, #1f77b4, #2e86ab); 
+                border-radius: 15px; margin-bottom: 2rem; color: white;'>
+        <h2>⚙️ Configuración</h2>
+        <p style='margin: 0; font-size: 0.9rem;'>Personaliza tu análisis</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Input del ticker principal
+    st.markdown("### 📈 Acción Principal")
+    stonk = st.text_input(
+        "**Ticker de la acción principal**", 
+        value="MSFT",
+        help="Ejemplos: AAPL, TSLA, GOOGL, AMZN, NVDA"
+    )
+    
+    # Selector de acciones para comparar
+    st.markdown("### 🔄 Comparar Con")
+    comparar_tickers = st.text_input(
+        "**Tickers para comparar (separados por coma)**", 
+        value="AAPL, GOOGL",
+        help="Ingresa hasta 5 tickers adicionales para comparar"
+    )
+    
+    # Procesar los tickers para comparar
+    tickers_comparar = [ticker.strip().upper() for ticker in comparar_tickers.split(",") if ticker.strip()]
+    
+    # Selector de período
+    st.markdown("### 📅 Período de Análisis")
+    periodo = st.selectbox(
+        "**Selecciona el período**", 
+        ["1 mes", "3 meses", "6 meses", "1 año", "3 años", "5 años"], 
+        index=4
+    )
+    
+    # Botón para análisis de IA
     st.markdown("---")
     st.markdown("### 🤖 Análisis IA")
+    
     if gemini_configured:
-        if st.button("🎯 Opinión de la IA"):
-            st.session_state.analisis_ia = True
+        col_btn1, col_btn2 = st.columns(2)
+        with col_btn1:
+            if st.button("🎯 Opinión de la IA", use_container_width=True, type="primary"):
+                st.session_state.analisis_ia = True
+        with col_btn2:
+            if st.button("🔄 Actualizar Datos", use_container_width=True):
+                st.rerun()
+        
+        if 'analisis_ia' not in st.session_state:
+            st.session_state.analisis_ia = False
+            
+        st.markdown("""
+        <div class='success-box'>
+            <strong>💡 Tip:</strong> La IA analizará todas las empresas y te dará recomendaciones específicas.
+        </div>
+        """, unsafe_allow_html=True)
     else:
-        st.markdown("<div class='info-box'><strong>⚠️</strong> Gemini no configurado. El análisis IA está deshabilitado.</div>", unsafe_allow_html=True)
+        st.markdown("""
+        <div class='warning-box'>
+            <strong>⚠️ Atención:</strong> Configura correctamente la API de Gemini para usar el análisis IA.
+        </div>
+        """, unsafe_allow_html=True)
 
-# Utilities: caching para descargas e info
-@st.cache_data(ttl=3600)
-def cached_download(tickers, start, end, interval):
-    # usa yfinance.download en lote para mejorar performance
+# CÁLCULO DE FECHAS SEGÚN PERIODO SELECCIONADO
+fecha_actual = datetime.now()
+periodo_map = {
+    "1 mes": timedelta(days=30),
+    "3 meses": timedelta(days=90),
+    "6 meses": timedelta(days=180),
+    "1 año": timedelta(days=365),
+    "3 años": timedelta(days=3*365),
+    "5 años": timedelta(days=5*365)
+}
+fecha_inicio = fecha_actual - periodo_map[periodo]
+
+# Función para calcular rendimientos porcentuales (CORREGIDA)
+def calcular_rendimientos(data):
+    """
+    Calcula los rendimientos porcentuales diarios y acumulados
+    """
+    data = data.copy()
+    
+    # Asegurarse de que Close es numérico
+    data['Close'] = pd.to_numeric(data['Close'], errors='coerce')
+    data = data.dropna(subset=['Close'])
+    
+    # Rendimiento diario porcentual
+    data['Rendimiento_Diario'] = data['Close'].pct_change() * 100
+    
+    # Rendimiento acumulado (desde el primer día del dataset)
+    if len(data) > 0:
+        precio_inicial = data['Close'].iloc[0]
+        data['Rendimiento_Acumulado'] = (data['Close'] / precio_inicial - 1) * 100
+    
+    # Rendimiento rolling (promedio móvil de 30 días)
+    data['Rendimiento_Rolling_30d'] = data['Rendimiento_Diario'].rolling(window=30).mean()
+    
+    # Volatilidad rolling (desviación estándar de 30 días)
+    data['Volatilidad_30d'] = data['Rendimiento_Diario'].rolling(window=30).std()
+    
+    return data
+
+# Función para obtener análisis comparativo de Gemini (manteniendo tu lógica)
+def obtener_analisis_ia(tickers, info_tickers, datos_tickers):
+    """
+    Obtiene análisis comparativo de Gemini basado en la información fundamental
+    """
     try:
-        df = yf.download(tickers, start=start.strftime('%Y-%m-%d'), end=end.strftime('%Y-%m-%d'), interval=interval, group_by='ticker', threads=True)
-        return df
+        # Construir prompt con información de todas las empresas
+        prompt = """
+        Eres un analista financiero senior. Analiza las siguientes empresas y proporciona un análisis completo:
+        
+        **INFORMACIÓN DE LAS EMPRESAS:**
+        """
+        
+        for ticker in tickers:
+            if ticker in info_tickers:
+                info = info_tickers[ticker]
+                data = datos_tickers[ticker]
+                
+                # Calcular métricas adicionales (manejar errores)
+                try:
+                    rendimiento_total = data['Rendimiento_Acumulado'].iloc[-1] if not data.empty and 'Rendimiento_Acumulado' in data.columns else 0
+                    volatilidad_promedio = data['Volatilidad_30d'].mean() if not data.empty and 'Volatilidad_30d' in data.columns else 0
+                except:
+                    rendimiento_total = 0
+                    volatilidad_promedio = 0
+                
+                prompt += f"""
+                
+                📊 **{ticker} - {info.get('longName', 'N/A')}**
+                **Sector:** {info.get('sector', 'N/A')}
+                **Valoración:**
+                • Capitalización: ${info.get('marketCap', 0):,.0f}
+                • P/E Ratio: {info.get('trailingPE', 'N/A')}
+                • Dividend Yield: {info.get('dividendYield', 0)*100:.2f}%
+                • Margen de Beneficio: {info.get('profitMargins', 0)*100:.2f}%
+                • Return on Equity: {info.get('returnOnEquity', 0)*100:.2f}%
+                • Rendimiento Total: {rendimiento_total:.2f}%
+                • Volatilidad: {volatilidad_promedio:.2f}%
+                """
+        
+        prompt += """
+        
+        **POR FAVOR PROPORCIONA:**
+        
+        🎯 **ANÁLISIS COMPARATIVO**
+        Compara las empresas en valoración, crecimiento y rentabilidad
+
+        📈 **OPINIÓN SOBRE COMPORTAMIENTO**
+        Analiza tendencias y patrones de precio
+
+        💡 **RECOMENDACIONES**
+        Recomendaciones específicas para cada empresa
+
+        🏆 **MEJOR OPCIÓN**
+        Cuál empresa consideras mejor para invertir y por qué
+
+        ⚠️ **RIESGOS**
+        Principales riesgos a considerar
+
+        **IMPORTANTE:** Sé detallado y usa números concretos.
+        """
+        
+        with st.spinner('🤖 Gemini está realizando análisis...'):
+            # Usar model (misma lógica original)
+            response = model.generate_content(prompt)
+        
+        return response.text
+        
     except Exception as e:
-        st.error(f"Error en descarga en lote: {e}")
-        return pd.DataFrame()
+        return f"❌ Error al obtener análisis de IA: {str(e)}"
 
-@st.cache_data(ttl=3600)
-def cached_ticker_info(ticker):
+# Función para descargar y procesar datos (CORREGIDA)
+def descargar_datos(ticker, fecha_inicio, fecha_actual):
     try:
-        t = yf.Ticker(ticker)
-        return t.info
-    except Exception:
+        with st.spinner(f'📥 Descargando {ticker}...'):
+            data = yf.download(ticker, start=fecha_inicio.strftime('%Y-%m-%d'), 
+                              end=fecha_actual.strftime('%Y-%m-%d'), interval='1d')
+        
+        if data.empty:
+            return None
+        
+        # Procesar datos
+        data = data.reset_index()
+        if isinstance(data.columns, pd.MultiIndex):
+            data.columns = [col[0] if col[1] == '' else f"{col[0]}_{col[1]}" for col in data.columns]
+        
+        # Mapeo de columnas
+        column_mapping = {'Date': 'Date', 'Open': 'Open', 'High': 'High', 'Low': 'Low', 
+                         'Close': 'Close', 'Volume': 'Volume', 'Adj Close': 'Close'}
+        
+        processed_data = pd.DataFrame()
+        for standard_name, possible_names in column_mapping.items():
+            for col_name in data.columns:
+                if col_name in possible_names or col_name.startswith(possible_names + '_'):
+                    processed_data[standard_name] = data[col_name]
+                    break
+        
+        data = processed_data
+        data['Date'] = pd.to_datetime(data['Date'])
+        
+        # Convertir columnas numéricas de forma segura
+        for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
+            if col in data.columns:
+                data[col] = pd.to_numeric(data[col], errors='coerce')
+        
+        data = data.dropna()
+        
+        # Calcular rendimientos
+        if not data.empty:
+            data = calcular_rendimientos(data)
+        
+        return data
+    except Exception as e:
+        st.error(f"Error descargando {ticker}: {e}")
+        return None
+
+# Función para obtener información de la empresa
+def obtener_info_empresa(ticker):
+    try:
+        with st.spinner(f'🔍 Obteniendo información de {ticker}...'):
+            ticker_obj = yf.Ticker(ticker)
+            info = ticker_obj.info
+        return info
+    except Exception as e:
+        st.error(f"Error obteniendo información de {ticker}: {e}")
         return {}
 
-# Técnical indicators
-def add_technical_indicators(df, sma_short=20, sma_long=50, ema_span=20):
-    df = df.copy()
-    df['SMA_short'] = df['Close'].rolling(window=sma_short, min_periods=1).mean()
-    df['SMA_long'] = df['Close'].rolling(window=sma_long, min_periods=1).mean()
-    df['EMA'] = df['Close'].ewm(span=ema_span, adjust=False).mean()
-    # MACD
-    ema12 = df['Close'].ewm(span=12, adjust=False).mean()
-    ema26 = df['Close'].ewm(span=26, adjust=False).mean()
-    df['MACD'] = ema12 - ema26
-    df['MACD_signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
-    # RSI
-    delta = df['Close'].diff()
-    up = delta.clip(lower=0)
-    down = -1 * delta.clip(upper=0)
-    roll_up = up.ewm(com=13, adjust=False).mean()
-    roll_down = down.ewm(com=13, adjust=False).mean()
-    rs = roll_up / roll_down.replace(0, np.nan)
-    df['RSI'] = 100 - (100 / (1 + rs))
-    return df
+# Función para mostrar tarjeta de métricas (CORREGIDA)
+def mostrar_metric_card(label, value, delta=None):
+    # Limpiar el valor si es un string con porcentaje
+    if isinstance(value, str) and '%' in value:
+        # Extraer solo el número para mostrar
+        clean_value = value.replace('%', '').replace('+', '')
+        try:
+            numeric_value = float(clean_value)
+            value = f"{numeric_value:+.2f}%"
+        except:
+            pass
+    
+    st.metric(label=label, value=value, delta=delta)
 
-# Performance metrics
+# Función para mostrar información corporativa (CORREGIDA)
+def mostrar_info_corporativa(ticker, info, es_principal=True):
+    if es_principal:
+        st.markdown(f'<div class="section-header">🏢 {ticker} - Información Corporativa</div>', unsafe_allow_html=True)
+    else:
+        st.markdown(f'<div class="company-section">')
+        st.markdown(f'<h3 style="color: #1f77b4; margin-bottom: 1.5rem;">🏢 {ticker} - Información Corporativa</h3>', unsafe_allow_html=True)
+    
+    # Header de la empresa
+    nombre = info.get("longName", "No disponible")
+    st.markdown(f"### {nombre}")
+    
+    # Métricas principales en cards
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        market_cap = info.get('marketCap', 0)
+        mostrar_metric_card("💰 Capitalización", f"${market_cap/1e9:.2f}B")
+    
+    with col2:
+        pe_ratio = info.get('trailingPE', 'N/A')
+        pe_display = f"{pe_ratio:.1f}" if pe_ratio != 'N/A' else 'N/A'
+        mostrar_metric_card("📊 P/E Ratio", pe_display)
+    
+    with col3:
+        dividend_yield = info.get('dividendYield', 0) * 100
+        mostrar_metric_card("💸 Dividend Yield", f"{dividend_yield:.2f}%")
+    
+    with col4:
+        sector = info.get('sector', 'N/A')
+        mostrar_metric_card("🏭 Sector", sector)
+    
+    # Segunda fila de métricas
+    col5, col6, col7, col8 = st.columns(4)
+    
+    with col5:
+        beta = info.get('beta', 'N/A')
+        beta_display = f"{beta:.2f}" if beta != 'N/A' else 'N/A'
+        mostrar_metric_card("📈 Beta", beta_display)
+    
+    with col6:
+        profit_margin = info.get('profitMargins', 0) * 100
+        mostrar_metric_card("🎯 Margen Beneficio", f"{profit_margin:.1f}%")
+    
+    with col7:
+        roe = info.get('returnOnEquity', 0) * 100
+        mostrar_metric_card("🚀 ROE", f"{roe:.1f}%")
+    
+    with col8:
+        employees = info.get('fullTimeEmployees', 'N/A')
+        emp_display = f"{employees:,}" if employees != 'N/A' else 'N/A'
+        mostrar_metric_card("👥 Empleados", emp_display)
+    
+    # Descripción de la empresa
+    descripcion = info.get("longBusinessSummary", "No disponible")
+    if descripcion != "No disponible":
+        st.markdown("#### 📝 Descripción de la Empresa")
+        st.markdown(f'<div class="info-box">{descripcion[:800]}...</div>', unsafe_allow_html=True)
+    
+    if not es_principal:
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# NUEVA: métricas de performance robustas (siempre devuelve claves)
 def compute_performance_metrics(df):
-    # Devuelve un dict con claves siempre presentes (posiblemente np.nan)
     metrics = {
         'CAGR': np.nan,
         'Cumulative': np.nan,
@@ -203,286 +505,226 @@ def compute_performance_metrics(df):
     try:
         if df is None or df.empty:
             return metrics
+        # Asegurar que Date esté presente y ordenado
+        df = df.sort_values('Date')
         rtn = df['Close'].pct_change().dropna()
         if rtn.empty:
             return metrics
         total_days = (df['Date'].iloc[-1] - df['Date'].iloc[0]).days
         years = total_days / 365.25 if total_days > 0 else 1/252
         cumulative_return = (df['Close'].iloc[-1] / df['Close'].iloc[0]) - 1
-        # CAGR
         metrics['CAGR'] = (1 + cumulative_return) ** (1 / years) - 1 if years > 0 else np.nan
-        # Volatilidad anualizada
         metrics['Annualized Volatility'] = rtn.std() * np.sqrt(252)
-        # Sharpe simple (sin rf)
         metrics['Sharpe'] = (rtn.mean() / rtn.std()) * np.sqrt(252) if rtn.std() != 0 else np.nan
-        # Max drawdown
         cum = (1 + rtn).cumprod()
         peak = cum.cummax()
         drawdown = (cum / peak) - 1
         metrics['Max Drawdown'] = drawdown.min()
         metrics['Cumulative'] = cumulative_return
     except Exception:
-        # en caso de error dejamos np.nan ya definidos
+        # en caso de error devolvemos los np.nan ya presentes
         pass
     return metrics
 
-# Helper para exportar CSV
-def df_to_csv_bytes(df):
-    buf = io.BytesIO()
-    df.to_csv(buf, index=False)
-    buf.seek(0)
-    return buf
-
-# Preparar lista de tickers
-todos_tickers = [stonk.upper()] + [t.upper() for t in tickers_comparar]
-# Limpiar duplicados y limitar tamaño razonable
-seen = []
-for t in todos_tickers:
-    if t not in seen:
-        seen.append(t)
-todos_tickers = seen[:8]  # límite de 8 para UI y performance
-
-# Descarga en lote
-with st.spinner("📥 Descargando datos..."):
-    raw_data = cached_download(todos_tickers + ([benchmark] if benchmark else []), fecha_inicio, fecha_actual, intervalo)
-
-# Procesar datos por ticker en dict
-datos_tickers = {}
-for t in todos_tickers:
-    try:
-        if len(todos_tickers) == 1:
-            # raw_data is simple DF
-            df_t = raw_data.copy()
-        else:
-            # yfinance group_by='ticker' estructura: columns multiindex
-            if isinstance(raw_data.columns, pd.MultiIndex):
-                if t in raw_data.columns.levels[0]:
-                    df_t = raw_data[t].reset_index()
-                else:
-                    df_t = pd.DataFrame()
+# CONTENIDO PRINCIPAL
+try:
+    # Lista de todos los tickers a procesar
+    todos_tickers = [stonk] + tickers_comparar
+    
+    # Mostrar progreso de descarga
+    with st.status("📥 Descargando datos de mercado...", expanded=True) as status:
+        st.write("Iniciando descarga de datos financieros...")
+        
+        # Descargar datos para todos los tickers
+        datos_tickers = {}
+        info_tickers = {}
+        
+        progress_bar = st.progress(0)
+        for i, ticker in enumerate(todos_tickers):
+            st.write(f"📊 Procesando {ticker}...")
+            data = descargar_datos(ticker, fecha_inicio, fecha_actual)
+            if data is not None:
+                datos_tickers[ticker] = data
+                info_tickers[ticker] = obtener_info_empresa(ticker)
+                st.success(f"✅ {ticker} - Datos descargados correctamente")
             else:
-                # si sólo devolvió una columna agrupada
-                df_t = raw_data.reset_index()
-        if df_t is None or df_t.empty:
-            datos_tickers[t] = pd.DataFrame()
-            continue
-        # Normalizar nombres (algunos endpoints devuelven 'Adj Close' como No MultiIndex)
-        if 'Date' not in df_t.columns and 'index' in df_t.columns:
-            df_t = df_t.rename(columns={'index': 'Date'})
-        if 'Date' not in df_t.columns:
-            df_t = df_t.reset_index().rename(columns={'index': 'Date'})
-        # Asegurar columnas numeric
-        for c in ['Open', 'High', 'Low', 'Close', 'Volume', 'Adj Close']:
-            if c in df_t.columns:
-                df_t[c] = pd.to_numeric(df_t[c], errors='coerce')
-        # Preferir 'Adj Close' si existe
-        if 'Adj Close' in df_t.columns and 'Close' in df_t.columns:
-            df_t['Close'] = df_t['Adj Close'].combine_first(df_t['Close'])
-        df_t['Date'] = pd.to_datetime(df_t['Date'])
-        df_t = df_t.sort_values('Date').dropna(subset=['Close'])
-        if not df_t.empty:
-            df_t = add_technical_indicators(df_t) if show_indicators else df_t
-            df_t['Rendimiento_Diario'] = df_t['Close'].pct_change() * 100
-            df_t['Rendimiento_Acumulado'] = (df_t['Close'] / df_t['Close'].iloc[0] - 1) * 100
-        datos_tickers[t] = df_t
-    except Exception as e:
-        st.warning(f"Error procesando {t}: {e}")
-        datos_tickers[t] = pd.DataFrame()
-
-# Obtener info de tickers (cacheada) - nota: puede ser lenta para muchos tickers
-info_tickers = {}
-for t in todos_tickers:
-    info_tickers[t] = cached_ticker_info(t)
-
-# Mostrar resumen ejecutivo
-st.markdown('<div class="section-header">📋 Resumen Ejecutivo</div>', unsafe_allow_html=True)
-resumen_data = []
-for ticker in todos_tickers:
-    df = datos_tickers.get(ticker, pd.DataFrame())
-    info = info_tickers.get(ticker, {})
-    last_price = 'N/A'
-    rendimiento_total = np.nan
-    metrics = compute_performance_metrics(df)
-
-    if df is not None and not df.empty:
-        last_price = df['Close'].iloc[-1]
-        if 'Rendimiento_Acumulado' in df.columns:
-            rendimiento_total = df['Rendimiento_Acumulado'].iloc[-1]
-
-    resumen_data.append({
-        'Ticker': ticker,
-        'Precio': f"${last_price:.2f}" if isinstance(last_price, (int, float, np.floating)) else 'N/A',
-        'Rendimiento': f"{rendimiento_total:+.2f}%" if not pd.isna(rendimiento_total) else 'N/A',
-        'CAGR': f"{metrics.get('CAGR', np.nan)*100:+.2f}%" if not pd.isna(metrics.get('CAGR', np.nan)) else 'N/A',
-        'Sharpe': f"{metrics.get('Sharpe', np.nan):.2f}" if not pd.isna(metrics.get('Sharpe', np.nan)) else 'N/A',
-        'Max DD': f"{metrics.get('Max Drawdown', np.nan)*100:.2f}%" if not pd.isna(metrics.get('Max Drawdown', np.nan)) else 'N/A',
-        'Market Cap': f"${info.get('marketCap', 'N/A')/1e9:.1f}B" if isinstance(info.get('marketCap', None), (int, float)) else info.get('marketCap','N/A'),
-        'Sector': info.get('sector', 'N/A')
-    })
-
-df_resumen = pd.DataFrame(resumen_data)
-
-# Asegurar que las columnas que vamos a formatear existen
-expected_cols = ['Precio','Rendimiento','CAGR','Sharpe','Max DD']
-subset_cols = [c for c in expected_cols if c in df_resumen.columns]
-
-if subset_cols:
-    # Aplicar formato solo a las columnas existentes
-    styled = df_resumen.style.format({col: "{}" for col in subset_cols}, na_rep='N/A')
-    st.dataframe(styled, use_container_width=True, height=220)
-else:
-    st.dataframe(df_resumen, use_container_width=True, height=220)
-
-# GRÁFICOS
-col_g1, col_g2 = st.columns([2,1])
-with col_g1:
-    st.markdown('<div class="section-header">📈 Evolución de Precios (normalizado opcional)</div>', unsafe_allow_html=True)
-    normalizar = st.checkbox("Normalizar precios al 100% al inicio para comparar tendencias", value=True)
-    fig, ax = plt.subplots(figsize=(12,6))
-    for t in todos_tickers:
-        df = datos_tickers.get(t, pd.DataFrame())
-        if df is None or df.empty:
-            continue
-        plot_df = df.copy()
-        if normalizar:
-            plot_df['Norm'] = plot_df['Close'] / plot_df['Close'].iloc[0] * 100
-            ax.plot(plot_df['Date'], plot_df['Norm'], label=t)
+                datos_tickers[ticker] = pd.DataFrame()
+                st.error(f"❌ {ticker} - Error en descarga")
+            
+            progress_bar.progress((i + 1) / len(todos_tickers))
+        
+        status.update(label="✅ ¡Todos los datos descargados!", state="complete", expanded=False)
+    
+    if not any(not df.empty for df in datos_tickers.values()):
+        st.error("❌ No se encontraron datos para ningún ticker ingresado")
+        st.stop()
+    
+    # SECCIÓN: ANÁLISIS DE IA (si se solicitó)
+    if st.session_state.get('analisis_ia', False) and gemini_configured:
+        st.markdown('<div class="section-header">🤖 Análisis Inteligente por IA</div>', unsafe_allow_html=True)
+        
+        with st.spinner('🚀 Ejecutando análisis avanzado con Gemini...'):
+            analisis_ia = obtener_analisis_ia(todos_tickers, info_tickers, datos_tickers)
+        
+        st.markdown(f'<div class="ai-analysis">{analisis_ia}</div>', unsafe_allow_html=True)
+        
+        # Botones de acción
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            if st.button("🗑️ Cerrar Análisis IA", use_container_width=True):
+                st.session_state.analisis_ia = False
+                st.rerun()
+    
+    # RESUMEN EJECUTIVO (CORREGIDO - manejo defensivo de columnas)
+    st.markdown('<div class="section-header">📋 Resumen Ejecutivo</div>', unsafe_allow_html=True)
+    
+    # Crear resumen con métricas clave (versión robusta)
+    resumen_data = []
+    for ticker in todos_tickers:
+        if ticker in datos_tickers and ticker in info_tickers:
+            data = datos_tickers[ticker]
+            info = info_tickers[ticker]
+            
+            last_price = 'N/A'
+            rendimiento_total = np.nan
+            metrics = compute_performance_metrics(data)
+            
+            if not data.empty and 'Close' in data.columns:
+                last_price = data['Close'].iloc[-1]
+            if not data.empty and 'Rendimiento_Acumulado' in data.columns:
+                rendimiento_total = data['Rendimiento_Acumulado'].iloc[-1]
+            
+            market_cap_display = 'N/A'
+            market_cap = info.get('marketCap', None)
+            if isinstance(market_cap, (int, float)):
+                market_cap_display = f"${market_cap/1e9:.1f}B"
+            else:
+                market_cap_display = info.get('marketCap','N/A')
+            
+            resumen_data.append({
+                'Ticker': ticker,
+                'Precio': f"${last_price:.2f}" if isinstance(last_price, (int, float, np.floating)) else 'N/A',
+                'Rendimiento': f"{rendimiento_total:+.2f}%" if not pd.isna(rendimiento_total) else 'N/A',
+                'CAGR': f"{metrics.get('CAGR', np.nan)*100:+.2f}%" if not pd.isna(metrics.get('CAGR', np.nan)) else 'N/A',
+                'Sharpe': f"{metrics.get('Sharpe', np.nan):.2f}" if not pd.isna(metrics.get('Sharpe', np.nan)) else 'N/A',
+                'Max DD': f"{metrics.get('Max Drawdown', np.nan)*100:.2f}%" if not pd.isna(metrics.get('Max Drawdown', np.nan)) else 'N/A',
+                'Market Cap': market_cap_display,
+                'Sector': info.get('sector', 'N/A')
+            })
+    
+    if resumen_data:
+        df_resumen = pd.DataFrame(resumen_data)
+        
+        # Aplicar formato solo a las columnas presentes (evita KeyError)
+        expected_cols = ['Precio','Rendimiento','CAGR','Sharpe','Max DD']
+        subset_cols = [c for c in expected_cols if c in df_resumen.columns]
+        if subset_cols:
+            styled_df = df_resumen.style.applymap(
+                lambda val: 'background-color: #d4edda; color: #155724;' if isinstance(val, str) and val.startswith('+') else
+                            ('background-color: #f8d7da; color: #721c24;' if isinstance(val, str) and val.startswith('-') else ''),
+                subset=['Rendimiento'] if 'Rendimiento' in df_resumen.columns else None
+            )
+            st.dataframe(styled_df, use_container_width=True, height=200)
         else:
-            ax.plot(plot_df['Date'], plot_df['Close'], label=t)
-    ax.set_xlabel("Fecha")
-    ax.set_ylabel("Precio (normalizado)" if normalizar else "Precio (USD)")
-    ax.legend(loc='best')
-    ax.grid(alpha=0.3)
-    st.pyplot(fig)
+            st.dataframe(df_resumen, use_container_width=True, height=200)
+    
+    # GRÁFICOS PRINCIPALES CON MATPLOTLIB
+    col_graf1, col_graf2 = st.columns(2)
+    
+    with col_graf1:
+        st.markdown('<div class="section-header">📈 Comparación de Precios</div>', unsafe_allow_html=True)
+        
+        fig, ax = plt.subplots(figsize=(14, 7))
+        
+        colores = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
+        
+        for i, (ticker, data) in enumerate(datos_tickers.items()):
+            if data is None or data.empty:
+                continue
+            color = colores[i % len(colores)]
+            
+            # Muestreo para mejor performance
+            if len(data) > 100:
+                data_plot = data.iloc[::5]
+            else:
+                data_plot = data
+            
+            ax.plot(data_plot['Date'], data_plot['Close'], 
+                   label=ticker, color=color, linewidth=2.5, alpha=0.8)
+        
+        ax.set_title(f"Evolución de Precios - {periodo}", fontsize=16, fontweight='bold', pad=20)
+        ax.set_xlabel("Fecha", fontsize=12)
+        ax.set_ylabel("Precio (USD)", fontsize=12)
+        ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        ax.grid(True, alpha=0.3)
+        ax.tick_params(axis='x', rotation=45)
+        plt.tight_layout()
+        
+        st.pyplot(fig)
+    
+    with col_graf2:
+        st.markdown('<div class="section-header">📊 Rendimientos Acumulados</div>', unsafe_allow_html=True)
+        
+        fig, ax = plt.subplots(figsize=(14, 7))
+        
+        for i, (ticker, data) in enumerate(datos_tickers.items()):
+            if data is None or data.empty:
+                continue
+            color = colores[i % len(colores)]
+            
+            if len(data) > 100:
+                data_plot = data.iloc[::5]
+            else:
+                data_plot = data
+            
+            if 'Rendimiento_Acumulado' in data_plot.columns:
+                ax.plot(data_plot['Date'], data_plot['Rendimiento_Acumulado'], 
+                       label=ticker, color=color, linewidth=2.5, alpha=0.8)
+        
+        ax.axhline(y=0, color='black', linestyle='--', alpha=0.5, linewidth=1)
+        ax.set_title(f"Rendimientos Acumulados - {periodo}", fontsize=16, fontweight='bold', pad=20)
+        ax.set_xlabel("Fecha", fontsize=12)
+        ax.set_ylabel("Rendimiento (%)", fontsize=12)
+        ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        ax.grid(True, alpha=0.3)
+        ax.tick_params(axis='x', rotation=45)
+        plt.tight_layout()
+        
+        st.pyplot(fig)
+    
+    # INFORMACIÓN DETALLADA POR EMPRESA
+    st.markdown('<div class="section-header">🏢 Análisis por Empresa</div>', unsafe_allow_html=True)
+    
+    # Usar pestañas para cada empresa
+    tabs = st.tabs([f"📊 {ticker}" for ticker in todos_tickers if ticker in info_tickers])
+    
+    for i, ticker in enumerate([t for t in todos_tickers if t in info_tickers]):
+        with tabs[i]:
+            if ticker in info_tickers and info_tickers[ticker]:
+                mostrar_info_corporativa(ticker, info_tickers[ticker], es_principal=(i == 0))
+    
+    # FOOTER MEJORADO
+    st.markdown("---")
+    st.markdown("""
+    <div style='text-align: center; color: #6c757d; padding: 3rem; background: linear-gradient(135deg, #f8f9fa, #e9ecef); 
+                border-radius: 15px; margin-top: 2rem;'>
+        <h3 style='color: #1f77b4; margin-bottom: 1rem;'>🚀 FinAnalyzer Pro</h3>
+        <p style='margin-bottom: 0.5rem;'><strong>Plataforma de análisis financiero avanzado</strong></p>
+        <p style='margin-bottom: 1rem; font-size: 0.9rem;'>
+            Desarrollado con Streamlit • Integración con Yahoo Finance • Análisis IA con Gemini
+        </p>
+        <p style='margin-top: 1.5rem; font-size: 0.8rem; color: #868e96;'>
+            Última actualización: {} | © 2024 FinAnalyzer Pro
+        </p>
+    </div>
+    """.format(fecha_actual.strftime('%Y-%m-%d %H:%M:%S')), unsafe_allow_html=True)
 
-with col_g2:
-    st.markdown('<div class="section-header">📊 Correlación y Heatmap</div>', unsafe_allow_html=True)
-    if show_correlation:
-        # crear dataframe de returns
-        returns = pd.DataFrame()
-        for t in todos_tickers:
-            df = datos_tickers.get(t, pd.DataFrame())
-            if df is None or df.empty: continue
-            returns[t] = df.set_index('Date')['Close'].pct_change().rename(t)
-        if not returns.empty:
-            corr = returns.corr()
-            fig2, ax2 = plt.subplots(figsize=(6,5))
-            sns.heatmap(corr, annot=True, cmap='coolwarm', vmin=-1, vmax=1, ax=ax2)
-            ax2.set_title("Correlación de retornos")
-            st.pyplot(fig2)
-        else:
-            st.info("No hay suficientes datos para calcular correlación.")
-
-# INDICADORES EN DETALLE (pestañas por ticker)
-st.markdown('<div class="section-header">🏢 Análisis por Empresa</div>', unsafe_allow_html=True)
-tabs = st.tabs([f"{t}" for t in todos_tickers])
-for i, t in enumerate(todos_tickers):
-    with tabs[i]:
-        df = datos_tickers.get(t, pd.DataFrame())
-        info = info_tickers.get(t, {})
-        if df is None or df.empty:
-            st.warning(f"No hay datos para {t}")
-            continue
-        # Titular y botones de exportación
-        colA, colB = st.columns([3,1])
-        with colA:
-            st.subheader(f"{t} - {info.get('longName','')}")
-            st.write(f"Sector: {info.get('sector','N/A')} | Market cap: {info.get('marketCap','N/A')}")
-        with colB:
-            csv_bytes = df_to_csv_bytes(df)
-            st.download_button(label="📥 Descargar CSV", data=csv_bytes, file_name=f"{t}_data.csv", mime="text/csv")
-        # Mostrar métricas
-        metrics = compute_performance_metrics(df)
-        cols = st.columns(4)
-        cols[0].metric("Precio", f"${df['Close'].iloc[-1]:.2f}", "")
-        cols[1].metric("CAGR", f"{metrics.get('CAGR',0)*100:+.2f}%" if metrics else "N/A")
-        cols[2].metric("Sharpe", f"{metrics.get('Sharpe',np.nan):.2f}" if metrics else "N/A")
-        cols[3].metric("Max Drawdown", f"{metrics.get('Max Drawdown',0)*100:.2f}%" if metrics else "N/A")
-        # Price chart con overlays
-        fig3, ax3 = plt.subplots(figsize=(12,5))
-        ax3.plot(df['Date'], df['Close'], label='Close', color='#1f77b4')
-        if show_indicators and 'SMA_short' in df.columns:
-            ax3.plot(df['Date'], df['SMA_short'], label='SMA short', linestyle='--', alpha=0.8)
-            ax3.plot(df['Date'], df['SMA_long'], label='SMA long', linestyle='--', alpha=0.8)
-            ax3.plot(df['Date'], df['EMA'], label='EMA', linestyle=':', alpha=0.8)
-        ax3.set_title(f"{t} - Precio e indicadores")
-        ax3.set_xlabel("Fecha")
-        ax3.set_ylabel("Precio (USD)")
-        ax3.legend(loc='upper left')
-        ax3.grid(alpha=0.2)
-        st.pyplot(fig3)
-        # MACD y RSI si existen
-        if show_indicators and 'MACD' in df.columns:
-            fig4, (axm, axr) = plt.subplots(2,1, figsize=(12,6), gridspec_kw={'height_ratios':[2,1]})
-            axm.plot(df['Date'], df['MACD'], label='MACD')
-            axm.plot(df['Date'], df['MACD_signal'], label='MACD signal')
-            axm.axhline(0, color='black', linestyle='--', alpha=0.5)
-            axm.legend()
-            axm.set_title("MACD")
-            axr.plot(df['Date'], df['RSI'], label='RSI', color='purple')
-            axr.axhline(70, color='red', linestyle='--', alpha=0.5)
-            axr.axhline(30, color='green', linestyle='--', alpha=0.5)
-            axr.set_ylim(0,100)
-            axr.set_title("RSI (14)")
-            st.pyplot(fig4)
-        # Tabla de últimos valores
-        st.dataframe(df[['Date','Close','Rendimiento_Diario']].tail(10), use_container_width=True)
-
-# Backtest simple: cartera igual ponderada
-st.markdown('<div class="section-header">💼 Backtest simple - Cartera igual ponderada</div>', unsafe_allow_html=True)
-if len(todos_tickers) >= 1:
-    # construir returns aligned
-    price_df = pd.DataFrame()
-    for t in todos_tickers:
-        df = datos_tickers.get(t, pd.DataFrame())
-        if df is None or df.empty: continue
-        tmp = df.set_index('Date')['Close'].rename(t)
-        price_df = pd.concat([price_df, tmp], axis=1)
-    price_df = price_df.dropna(axis=0, how='any')
-    if price_df.empty:
-        st.info("No hay datos comunes para realizar backtest")
-    else:
-        returns = price_df.pct_change().dropna()
-        weights = np.array([1/returns.shape[1]]*returns.shape[1])
-        portfolio_returns = returns.dot(weights)
-        portfolio_cum = (1 + portfolio_returns).cumprod()
-        bh_returns = (1 + returns.mean(axis=1)).cumprod()
-        fig5, ax5 = plt.subplots(figsize=(10,5))
-        ax5.plot(portfolio_cum.index, portfolio_cum.values, label='Cartera igual ponderada')
-        ax5.plot(bh_returns.index, bh_returns.values, label='Promedio Buy&Hold (por ticker)')
-        ax5.legend()
-        ax5.set_title("Backtest simplificado")
-        ax5.set_ylabel("Crecimiento acumulado")
-        st.pyplot(fig5)
-        # métricas
-        port_metrics = {}
-        port_metrics['Cumulative'] = portfolio_cum.values[-1]-1
-        port_metrics['CAGR'] = (portfolio_cum.values[-1])**(1/((portfolio_cum.index[-1]-portfolio_cum.index[0]).days/365.25)) - 1
-        port_metrics['Volatility'] = portfolio_returns.std() * np.sqrt(252)
-        st.write("Métricas de cartera:")
-        st.json(port_metrics)
-
-# Análisis IA (limitado por tokens y número de tickers)
-if st.session_state.get('analisis_ia', False) and gemini_configured and model is not None:
-    st.markdown('<div class="section-header">🤖 Análisis IA (Gemini)</div>', unsafe_allow_html=True)
-    # Construir prompt acotado
-    limited_tickers = todos_tickers[:max_tickers]
-    prompt_lines = ["Eres un analista financiero senior. Resume y compara brevemente las siguientes empresas con métricas claves:"]
-    for t in limited_tickers:
-        info = info_tickers.get(t, {})
-        df = datos_tickers.get(t, pd.DataFrame())
-        last_price = df['Close'].iloc[-1] if not df.empty else 'N/A'
-        cagr = compute_performance_metrics(df).get('CAGR', None)
-        prompt_lines.append(f"- {t}: nombre={info.get('longName','N/A')}, sector={info.get('sector','N/A')}, price={last_price}, CAGR={cagr}")
-    prompt_lines.append("Proporciona: 1) resumen, 2) riesgos, 3) recomendación (compáralas). Usa números concretos cuando existan.")
-    prompt = "\n".join(prompt_lines)[:5000]  # acotar longitud
-    try:
-        with st.spinner("🤖 Gemini generando análisis..."):
-            response = model.generate_content(prompt)
-            st.markdown(f"<div class='info-box'>{response.text}</div>", unsafe_allow_html=True)
-    except Exception as e:
-        st.error(f"Error pidiendo análisis a Gemini: {e}")
-
-# FOOTER
-st.markdown("---")
-st.markdown(f"<div style='text-align:center;color:#6c757d;padding:2rem'>Última actualización: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} • © FinAnalyzer Pro</div>", unsafe_allow_html=True)
+except Exception as e:
+    st.error(f"""
+    ❌ Error al procesar los datos: {str(e)}
+    
+    **Solución de problemas:**
+    - Verifica tu conexión a internet
+    - Revisa que los tickers sean válidos
+    - Intenta con un período de tiempo más corto
+    """)
