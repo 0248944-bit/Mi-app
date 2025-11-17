@@ -4,7 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime, timedelta
-from google import genai
+import google.generativeai as genai
 import matplotlib.dates as mdates
 import numpy as np
 
