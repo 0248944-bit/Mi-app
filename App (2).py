@@ -20,7 +20,7 @@ st.set_page_config(
 st.title("📊 FinAnalyzer Pro - Análisis Financiero Inteligente")
 
 # Clave de API de Gemini
-API_KEY = "AIzaSyCMqbyl7yrGtY-Os1BPgoOJpRnX49E_Wv0"
+API_KEY = "AIzaSyC2Tgi1fsszmLTaLdeA2QSFX6a1IltBHw0"
 
 # Estilos CSS mejorados
 st.markdown("""
