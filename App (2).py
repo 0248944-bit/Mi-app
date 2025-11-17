@@ -163,13 +163,14 @@ st.markdown("""
 
 # Configuración de Gemini (SINTAXIS ACTUALIZADA)
 try:
-    from google import genai
-    client = genai.Client(api_key=API_KEY)
+    import google.generativeai as genai
+    genai.configure(api_key=API_KEY)
+    model = genai.GenerativeModel('gemini-pro')
     gemini_configured = True
     
 except Exception as e:
     st.sidebar.warning(f"⚠️ Error configurando Gemini: {e}")
-    client = None
+    model = None
     gemini_configured = False
 
 # HEADER PRINCIPAL MEJORADO
