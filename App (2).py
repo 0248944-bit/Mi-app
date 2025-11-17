@@ -19,8 +19,8 @@ st.set_page_config(
 # Título de la app
 st.title("📊 FinAnalyzer Pro - Análisis Financiero Inteligente")
 
-# Clave de API de Gemini - REEMPLAZA CON TU API KEY REAL
-API_KEY = os.getenv('API_KEY', 'fallback_key_si_no_existe')
+# 🔑 CLIENTE: REEMPLAZA ESTA LÍNEA CON TU API KEY REAL
+API_KEY = "AIzaSyC2Tgi1fsszmLTaLdeA2QSFX6a1IltBHw0" 
 
 # Estilos CSS mejorados
 st.markdown("""
@@ -164,47 +164,44 @@ st.markdown("""
 # Configuración de Gemini (SINTAXIS CORREGIDA)
 try:
     import google.generativeai as genai
+    
+    # Verificación crítica de API Key
+    if not API_KEY or API_KEY.startswith("AIzaSyColoca") or "AquiTuApiKey" in API_KEY:
+        st.sidebar.error("""
+        🔑 ERROR: API Key no configurada
+        
+        **Para solucionar:**
+        1. Ve a https://aistudio.google.com/
+        2. Crea una API Key
+        3. Reemplaza la línea 18 con tu clave real
+        4. La clave debe empezar con: AIzaSy...
+        """)
+        raise Exception("API Key no configurada")
+    
     genai.configure(api_key=API_KEY)
     
-    # Obtener la lista de modelos disponibles
-    modelos_disponibles = []
-    for m in genai.list_models():
-        if 'generateContent' in m.supported_generation_methods:
-            modelos_disponibles.append(m.name)
+    # Intentar conexión con modelo simple
+    model = genai.GenerativeModel('gemini-pro')
+    test_response = model.generate_content("Hola")
+    gemini_configured = True
+    st.sidebar.success("✅ Gemini configurado correctamente")
     
-    st.sidebar.info(f"📋 Modelos disponibles: {len(modelos_disponibles)}")
-    
-    # Buscar un modelo que funcione
-    modelo_funcional = None
-    modelos_a_probar = [
-        'models/gemini-1.0-pro',
-        'models/gemini-pro',
-        'models/gemini-1.5-flash-latest',
-        'models/gemini-1.5-pro-latest'
-    ]
-    
-    for modelo in modelos_a_probar:
-        if any(modelo in disponible for disponible in modelos_disponibles):
-            modelo_funcional = modelo
-            break
-    
-    if modelo_funcional:
-        model = genai.GenerativeModel(modelo_funcional)
-        # Probar el modelo
-        test_response = model.generate_content("Hola")
-        gemini_configured = True
-        st.sidebar.success(f"✅ Conectado a: {modelo_funcional}")
-    else:
-        # Usar el primer modelo disponible
-        if modelos_disponibles:
-            model = genai.GenerativeModel(modelos_disponibles[0])
-            gemini_configured = True
-            st.sidebar.success(f"✅ Usando: {modelos_disponibles[0]}")
-        else:
-            raise Exception("No hay modelos disponibles")
-            
 except Exception as e:
-    st.sidebar.error(f"❌ Error Gemini: {str(e)}")
+    error_msg = str(e)
+    if "API_KEY" in error_msg or "key" in error_msg.lower() or "quota" in error_msg.lower():
+        st.sidebar.error(f"🔑 Error de API: {error_msg}")
+    elif "404" in error_msg:
+        st.sidebar.error("""
+        ❌ Error 404: Modelo no encontrado
+        
+        **Soluciones:**
+        1. Actualiza la librería: pip install --upgrade google-generativeai
+        2. Verifica que tu API Key sea válida
+        3. Asegúrate de tener facturación configurada en Google Cloud
+        """)
+    else:
+        st.sidebar.error(f"❌ Error Gemini: {error_msg}")
+    
     model = None
     gemini_configured = False
 
