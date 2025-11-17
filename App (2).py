@@ -163,17 +163,15 @@ st.markdown("""
 
 # Configuración de Gemini 
 try:
-    client = genai.Client(api_key=API_KEY)  
+    import google.generativeai as genai
+    genai.configure(api_key=API_KEY)
+    model = genai.GenerativeModel('gemini-pro')
     gemini_configured = True
+    st.sidebar.success("✅ Gemini configurado correctamente")
 except Exception as e:
-    try:
-        import google.generativeai as genai
-        client = genai.Client(api_key=API_KEY)
-        gemini_configured = True
-    except Exception as e2:
-        st.sidebar.warning(f"⚠️ Error configurando Gemini: {e2}")
-        client = None
-        gemini_configured = False
+    st.sidebar.warning(f"Error configurando Gemini: {e}")
+    model = None
+    gemini_configured = False
 
 # HEADER PRINCIPAL MEJORADO
 col1, col2, col3 = st.columns([1, 2, 1])
@@ -352,10 +350,8 @@ def obtener_analisis_ia(tickers, info_tickers, datos_tickers):
         """
         
         with st.spinner('🤖 Gemini está realizando análisis...'):
-            response = client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=prompt
-            )
+            # ✅ CORRECCIÓN: Usar model en lugar de client.models
+            response = model.generate_content(prompt)
         
         return response.text
         
