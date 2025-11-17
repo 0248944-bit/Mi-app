@@ -167,7 +167,7 @@ try:
     gemini_configured = True
 except Exception as e:
     try:
-        from google import genai
+        import google.generativeai as genai
         client = genai.Client(api_key=API_KEY)
         gemini_configured = True
     except Exception as e2:
