@@ -165,45 +165,64 @@ st.markdown("""
 try:
     import google.generativeai as genai
     
-    # Verificación crítica de API Key
-    if not API_KEY or API_KEY.startswith("AIzaSyColoca") or "AquiTuApiKey" in API_KEY:
+    # Verificación crítica de API Key (ASUMIENDO QUE API_KEY YA ESTÁ DEFINIDA)
+    if not API_KEY or API_KEY.startswith("AIzaSyColoca") or "AquiTuApiKey" in API_KEY or "your_api_key_here" in API_KEY:
         st.sidebar.error("""
-        🔑 ERROR: API Key no configurada
+        🔑 ERROR: API Key no configurada correctamente
         
         **Para solucionar:**
         1. Ve a https://aistudio.google.com/
         2. Crea una API Key
-        3. Reemplaza la línea 18 con tu clave real
+        3. Reemplaza el valor de API_KEY con tu clave real
         4. La clave debe empezar con: AIzaSy...
         """)
-        raise Exception("API Key no configurada")
-    
-    genai.configure(api_key=API_KEY)
-    
-    # Intentar conexión con modelo simple
-    model = genai.GenerativeModel('gemini-pro')
-    test_response = model.generate_content("Hola")
-    gemini_configured = True
-    st.sidebar.success("✅ Gemini configurado correctamente")
-    
-except Exception as e:
-    error_msg = str(e)
-    if "API_KEY" in error_msg or "key" in error_msg.lower() or "quota" in error_msg.lower():
-        st.sidebar.error(f"🔑 Error de API: {error_msg}")
-    elif "404" in error_msg:
-        st.sidebar.error("""
-        ❌ Error 404: Modelo no encontrado
-        
-        **Soluciones:**
-        1. Actualiza la librería: pip install --upgrade google-generativeai
-        2. Verifica que tu API Key sea válida
-        3. Asegúrate de tener facturación configurada en Google Cloud
-        """)
+        gemini_configured = False
+        model = None
     else:
-        st.sidebar.error(f"❌ Error Gemini: {error_msg}")
-    
-    model = None
+        # Configurar Gemini
+        genai.configure(api_key=API_KEY)
+        
+        # Intentar conexión con modelo simple
+        try:
+            model = genai.GenerativeModel('gemini-pro')
+            test_response = model.generate_content("Test de conexión")
+            gemini_configured = True
+            st.sidebar.success("✅ Gemini configurado correctamente")
+            
+        except Exception as api_error:
+            error_msg = str(api_error)
+            if "API_KEY_INVALID" in error_msg:
+                st.sidebar.error("❌ API Key inválida. Verifica tu clave.")
+            elif "quota" in error_msg.lower() or "billing" in error_msg.lower():
+                st.sidebar.error("""
+                ❌ Error de facturación/cuota
+                
+                **Soluciones:**
+                1. Configura facturación en Google Cloud Console
+                2. Verifica que tengas créditos disponibles
+                3. Habilita la API de Gemini
+                """)
+            elif "404" in error_msg or "not found" in error_msg.lower():
+                st.sidebar.error("""
+                ❌ Error 404: Modelo no encontrado
+                
+                **Soluciones:**
+                1. Actualiza la librería: `pip install --upgrade google-generativeai`
+                2. Verifica que la API de Gemini esté habilitada
+                3. Asegúrate de tener facturación configurada en Google Cloud
+                """)
+            elif "429" in error_msg or "rate limit" in error_msg.lower():
+                st.sidebar.error("❌ Límite de tasa excedido. Espera unos minutos.")
+            else:
+                st.sidebar.error(f"❌ Error de Gemini: {error_msg}")
+            
+            gemini_configured = False
+            model = None
+
+except Exception as e:
+    st.sidebar.error(f"❌ Error general: {str(e)}")
     gemini_configured = False
+    model = None
 
 # HEADER PRINCIPAL MEJORADO
 col1, col2, col3 = st.columns([1, 2, 1])
@@ -325,9 +344,9 @@ def obtener_analisis_ia(tickers, info_tickers, datos_tickers):
     Obtiene análisis comparativo de Gemini basado en la información fundamental
     """
     try:
-        # Verificar que el modelo esté disponible
-        if model is None:
-            return "❌ Error: Modelo de Gemini no configurado correctamente"
+        # VERIFICACIÓN CORREGIDA:
+        if not gemini_configured or model is None:
+            return "❌ Error: Gemini no está configurado correctamente. Verifica tu API Key en la barra lateral."
         
         # Construir prompt con información de todas las empresas
         prompt = """
