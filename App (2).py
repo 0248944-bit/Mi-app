@@ -4,10 +4,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime, timedelta
-import google.generativeai as genai  # ← CORREGIDO: "genai" con N
 import matplotlib.dates as mdates
 import numpy as np
 import os
+
 # Configuración de la página (debe ser lo primero)
 st.set_page_config(
     page_title="FinAnalyzer Pro - Análisis Financiero Inteligente",
@@ -19,7 +19,7 @@ st.set_page_config(
 # Título de la app
 st.title("📊 FinAnalyzer Pro - Análisis Financiero Inteligente")
 
-# Clave de API de Gemini
+# Clave de API de Gemini - REEMPLAZA CON TU API KEY REAL
 API_KEY = os.getenv('API_KEY', 'fallback_key_si_no_existe')
 
 # Estilos CSS mejorados
@@ -161,18 +161,15 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Configuración de Gemini 
+# Configuración de Gemini (SINTAXIS ACTUALIZADA)
 try:
-    # Configurar la API key primero
-    genai.configure(api_key=API_KEY)
-    
-    # Inicializar el modelo (sintaxis actual)
-    model = genai.GenerativeModel('gemini-pro')
+    from google import genai
+    client = genai.Client(api_key=API_KEY)
     gemini_configured = True
     
 except Exception as e:
     st.sidebar.warning(f"⚠️ Error configurando Gemini: {e}")
-    model = None
+    client = None
     gemini_configured = False
 
 # HEADER PRINCIPAL MEJORADO
@@ -289,7 +286,7 @@ def calcular_rendimientos(data):
     
     return data
 
-# Función para obtener análisis comparativo de Gemini
+# Función para obtener análisis comparativo de Gemini (ACTUALIZADA)
 def obtener_analisis_ia(tickers, info_tickers, datos_tickers):
     """
     Obtiene análisis comparativo de Gemini basado en la información fundamental
@@ -352,7 +349,10 @@ def obtener_analisis_ia(tickers, info_tickers, datos_tickers):
         """
         
         with st.spinner('🤖 Gemini está realizando análisis...'):
-            response = model.generate_content(prompt)
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",  # MODELO ACTUALIZADO
+                contents=prompt
+            )
         
         return response.text
         
